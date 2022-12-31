@@ -24,6 +24,49 @@ $("#table_cmd").sortable({
   forcePlaceholderSize: true
 })
 
+/* Création d'une commande info */
+$('.cmdAction[data-action=add-info').on('click', function() {
+  bootbox.prompt({
+    title: "{{Type d'information}}",
+    inputType: "select",
+    inputOptions: [
+      {text: '{{Temperature}}', value: 1},
+      {text: '{{Ouvrant}}', value: 2}
+    ],
+    value: 1,
+    callback: function (result){
+      if (result == null) {
+        return
+      }
+      if (result == 1) {
+        cmd = {
+          configuration: {},
+          type : 'info',
+          subType : 'numeric',
+          logicalId : 'temperature'
+        }
+      } else if (result == 2) {
+        cmd = {
+          configuration: {},
+          type : 'info',
+          subType : 'binary',
+          logicalId : 'ouvrant'
+        }
+      }
+      addCmdToTable(cmd)
+    }
+  })
+})
+
+/* choix d'une info */
+$('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
+  var el = $(this)
+  jeedom.cmd.getSelectModal({ cmd: {type: 'info' } }, function(result) {
+    var calcul = el.closest('tr').find('.cmdAttr[data-l1key=configuration][data-l2key=' + el.data('input') + ']')
+    calcul.atCaret('insert',result.human)
+  })
+})
+
 /* Fonction permettant l'affichage des commandes dans l'équipement */
 function addCmdToTable(_cmd) {
   if (!isset(_cmd)) {
@@ -32,9 +75,13 @@ function addCmdToTable(_cmd) {
   if (!isset(_cmd.configuration)) {
     _cmd.configuration = {}
   }
+  if (init(_cmd.logicalId) == 'refresh') {
+    return;
+  }
   var tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
   tr += '<td class="hidden-xs">'
   tr += '<span class="cmdAttr" data-l1key="id"></span>'
+  tr += '<span class="cmdAttr hidden" data-l1key="logicalId"></span>'
   tr += '</td>'
   tr += '<td>'
   tr += '<div class="input-group">'
@@ -51,8 +98,19 @@ function addCmdToTable(_cmd) {
   tr += '<span class="subType" subType="' + init(_cmd.subType) + '"></span>'
   tr += '</td>'
   tr += '<td>'
+  if (! ['consigne'].includes(init(_cmd.logicalId))) {
+    tr += '<textarea class="cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="calcul" style="height:35px;" placeholder="{{Calcul}}"></textarea>'
+    tr += '<a class="btn btn-default listEquipementInfo btn-xs" data-input="calcul" style="width:100%;margin-top:2px;"><i class="fas fa-list-alt"></i> {{Rechercher équipement}}</a>'
+  }
+  tr += '</td>'
+  tr += '<td>'
+  if (! ['consigne'].includes(init(_cmd.logicalId))) {
+    tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="zone" placeholder="{{Zone}}" title="{{Zone}}">'
+  }
+  tr += '</td>'
+  tr += '<td>'
   tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isVisible" checked/>{{Afficher}}</label> '
-  tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isHistorized" checked/>{{Historiser}}</label> '
+  tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isHistorized"/>{{Historiser}}</label> '
   tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="display" data-l2key="invertBinary"/>{{Inverser}}</label> '
   tr += '<div style="margin-top:7px;">'
   tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="minValue" placeholder="{{Min}}" title="{{Min}}" style="width:30%;max-width:80px;display:inline-block;margin-right:2px;">'
@@ -68,7 +126,9 @@ function addCmdToTable(_cmd) {
     tr += '<a class="btn btn-default btn-xs cmdAction" data-action="configure"><i class="fas fa-cogs"></i></a> '
     tr += '<a class="btn btn-default btn-xs cmdAction" data-action="test"><i class="fas fa-rss"></i> Tester</a>'
   }
-  tr += '<i class="fas fa-minus-circle pull-right cmdAction cursor" data-action="remove" title="{{Supprimer la commande}}"></i></td>'
+  if (! ['consigne'].includes(init(_cmd.logicalId))) {
+    tr += '<i class="fas fa-minus-circle pull-right cmdAction cursor" data-action="remove" title="{{Supprimer la commande}}"></i></td>'
+  }
   tr += '</tr>'
   $('#table_cmd tbody').append(tr)
   var tr = $('#table_cmd tbody tr').last()

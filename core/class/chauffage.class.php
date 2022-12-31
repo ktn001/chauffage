@@ -78,8 +78,17 @@ class chauffage extends eqLogic {
 
 	// Fonction exécutée automatiquement après la création de l'équipement
 	public function postInsert() {
+		$refresh = new chauffageCmd();
+		$refresh->setLogicalId('refresh');
+		$refresh->setIsVisible(1);
+		$refresh->setName(__('Rafraichir',__FILE__));
+		$refresh->setType('action');
+		$refresh->setSubType('other');
+		$refresh->setEqLogic_id($this->getId());
+		$refresh->save();
 		$cmd = new chauffageCmd();
 		$cmd->setEqLogic_id($this->getId());
+		$cmd->setIsVisible(1);
 		$cmd->setName('consigne');
 		$cmd->setType('info');
 		$cmd->setSubType('numeric');
@@ -118,10 +127,10 @@ class chauffage extends eqLogic {
 	* Permet de crypter/décrypter automatiquement des champs de configuration des équipements
 	* Exemple avec le champ "Mot de passe" (password)
 	public function decrypt() {
-	  $this->setConfiguration('password', utils::decrypt($this->getConfiguration('password')));
+		$this->setConfiguration('password', utils::decrypt($this->getConfiguration('password')));
 	}
 	public function encrypt() {
-	  $this->setConfiguration('password', utils::encrypt($this->getConfiguration('password')));
+		$this->setConfiguration('password', utils::encrypt($this->getConfiguration('password')));
 	}
 	*/
 
@@ -134,8 +143,8 @@ class chauffage extends eqLogic {
 	* Permet de déclencher une action avant modification d'une variable de configuration du plugin
 	* Exemple avec la variable "param3"
 	public static function preConfig_param3( $value ) {
-	  // do some checks or modify on $value
-	  return $value;
+		// do some checks or modify on $value
+		return $value;
 	}
 	*/
 
@@ -143,7 +152,7 @@ class chauffage extends eqLogic {
 	* Permet de déclencher une action après modification d'une variable de configuration du plugin
 	* Exemple avec la variable "param3"
 	public static function postConfig_param3($value) {
-	  // no return value
+		// no return value
 	}
 	*/
 
@@ -163,15 +172,62 @@ class chauffageCmd extends cmd {
 
 	/*     * *********************Methode d'instance************************* */
 
-	/*
-	* Permet d'empêcher la suppression des commandes même si elles ne sont pas dans la nouvelle configuration de l'équipement envoyé en JS
+	
+	/* Permet d'empêcher la suppression des commandes même si elles ne sont pas dans la nouvelle configuration de l'équipement envoyé en JS */
 	public function dontRemoveCmd() {
-	  return true;
+		if (in_array($this->getLogicalId(),['consigne','refresh'])) {
+			return true;
+		}
+		return false;
 	}
-	*/
+	
+	public function preSave() {
+		if (in_array($this->getLogicalId(),['temperature', 'ouvrant'])){
+			$calcul = $this->getConfiguration('calcul');
+			if (strpos($calcul, '#' . $this->getId() . '#') !== false) {
+				throw new Exception(__('Vous ne pouvez appeler la commande elle-même (boucle infinie) sur', __FILE__) . ' : ' . $this->getName());
+			}
+			$added_value = [];
+			preg_match_all("/#([0-9]+)#/", $calcul, $matches);
+			$value = '';
+			foreach ($matches[1] as $cmd_id) {
+				if (isset($added_value[$cmd_id])){
+					continue;
+				}
+				$cmd = self::byId($cmd_id);
+				if (is_object($cmd) && $cmd->getType() == 'info') {
+					$value .= '#' . $cmd_id . '#';
+					$added_value[$cmd_id] = $cmd_id;
+				}
+			}
+			preg_match_all("/variable\((.+?)\)/", $calcul, $matches);
+			foreach ($matches[1] as $variable) {
+				if (isset($added_value['#variable(' . $variable . ')#'])){
+					continue;
+				}
+				$value .= '#variable(' . $variable . ')#';
+				$added_value['#variable(' . $variable . ')#'] = 1;
+			}
+			$this->setValue($value);
+		}
+	}
 
 	// Exécution d'une commande
 	public function execute($_options = array()) {
+		$eqLogic = $this->getEqLogic();
+		if ($this->getLogicalId() == 'refresh') {
+			$eqLogic->refresh();
+			return;
+		}
+		switch ($this->getType()) {
+		case 'info':
+			try {
+				return jeedom::evaluateExpression($this->getConfiguration('calcul'));
+			} catch (Exception $e) {
+				log::add('chaffage', 'info', $e->getMessage());
+				return $this->getConfiguration('calcul');
+			}
+		}
 	}
 
 	/*     * **********************Getteur Setteur*************************** */
