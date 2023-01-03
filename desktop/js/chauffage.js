@@ -23,6 +23,14 @@ $("#table_cmd").sortable({
   tolerance: "intersect",
   forcePlaceholderSize: true
 })
+$("#table_zones").sortable({
+  axis: "y",
+  cursor: "move",
+  items: ".zone",
+  placeholder: "ui-state-highlight",
+  tolerance: "intersect",
+  forcePlaceholderSize: true
+})
 
 /* Création d'une commande info */
 $('.cmdAction[data-action=add-info').on('click', function() {
@@ -67,6 +75,89 @@ $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   })
 })
 
+function saveEqLogic(eqLogic){
+  if (!isset(eqLogic.configuration)) {
+    eqLogic.configuration = {}
+  }
+  eqLogic.configuration.zones = $('.zone').getValues('.zoneAttr')
+  return eqLogic
+}
+
+/* Sur modification de zone */
+$('#table_zones').on({
+  'change': function(event){
+    modifyWithoutSave = true
+  }
+}, '.zoneAttr')
+
+/* Bouton d'ajout d'une zone */
+$('.zoneAction[data-action=add]').off('click').on('click', function() {
+  addZoneToTable()
+  modifyWithoutSave = true
+})
+
+/* Bouton de suppression d'une zone */
+$('#table_zones').on('click', '.zone .zoneAction[data-action=remove]', function() {
+  $(this).closest('tr').remove()
+  modifyWithoutSave = true
+})
+
+/* Renseignement de la table des zones */
+function printEqLogic(data) {
+  for (zone of data.configuration.zones) {
+    addZoneToTable (zone)
+  }
+}
+
+function addZoneToTable(_zone) {
+  if (!isset(_zone)){
+    var _zone = {}
+  }
+  if (!isset(_zone.id)) {
+    $.ajax({
+      type: 'POST',
+      url: 'plugins/chauffage/core/ajax/chauffage.ajax.php',
+      async: false,
+      data : {
+        action: 'getNextZoneId',
+        id : $('.eqLogicAttr[data-l1key=id]').value(),
+      },
+      dataType : 'json',
+      global:false,
+      error: function(request, status, error) {
+        handleAjaxError(request, status, error)
+      },
+      success: function(data) {
+        if (data.state != 'ok') {
+          $.fn.showAlert({message: data.result, level: 'danger'})
+          return ""
+        }
+        console.log(data.result);
+        nextId = data.result
+      }
+    })
+    _zone.id=nextId
+  }
+  console.log(_zone.id)
+  var tr = '<tr class="zone">'
+  tr += '<td class="hidden-xs">'
+  tr += '<span class="zoneAttr" data-l1key="id"></span>'
+  tr += '</td>'
+  tr += '<td>'
+  tr += '<input class="zoneAttr form-control input-sm" data-l1key="name" placeholder="{{Nom de la zone}}"/>'
+  tr += '</td>'
+  tr += '<td>'
+  tr += '<input type="checkbox" class="zoneAttr" data-l1key="isEnable" checked/>'
+  tr += '</td>'
+  tr += '<td>'
+  tr += '<i class="fas fa-minus-circle pull-right zoneAction cursor" data-action="remove" title="{{Supprimer la zone}}"></i></td>'
+  tr += '</td>'
+  tr += '</tr>'
+  $('#table_zones tbody').append(tr)
+  var tr = $('#table_zones tbody tr').last()
+  tr.setValues(_zone, '.zoneAttr')
+}
+
 /* Fonction permettant l'affichage des commandes dans l'équipement */
 function addCmdToTable(_cmd) {
   if (!isset(_cmd)) {
@@ -76,7 +167,7 @@ function addCmdToTable(_cmd) {
     _cmd.configuration = {}
   }
   if (init(_cmd.logicalId) == 'refresh') {
-    return;
+    return
   }
   var tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
   tr += '<td class="hidden-xs">'
