@@ -23,6 +23,8 @@ $("#table_cmd").sortable({
   tolerance: "intersect",
   forcePlaceholderSize: true
 })
+
+/* Permet la réorganisation des zones */
 $("#table_zones").sortable({
   axis: "y",
   cursor: "move",
@@ -66,7 +68,7 @@ $('.cmdAction[data-action=add-info').on('click', function() {
   })
 })
 
-/* choix d'une info */
+/* choix d'une info pour les calculs */
 $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   var el = $(this)
   jeedom.cmd.getSelectModal({ cmd: {type: 'info' } }, function(result) {
@@ -75,6 +77,7 @@ $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   })
 })
 
+/* Complète les données à enregister en y ajoutant les zones */
 function saveEqLogic(eqLogic){
   if (!isset(eqLogic.configuration)) {
     eqLogic.configuration = {}
@@ -84,11 +87,12 @@ function saveEqLogic(eqLogic){
 }
 
 /* Sur modification de zone */
-$('#table_zones').on({
-  'change': function(event){
-    modifyWithoutSave = true
+$('#table_zones').on('change sortstop', function(){
+  modifyWithoutSave = true
+  if ($('input[name=selectvue]:checked').val() == 'zone') {
+    buildSelectZone()
   }
-}, '.zoneAttr')
+})
 
 /* Bouton d'ajout d'une zone */
 $('.zoneAction[data-action=add]').off('click').on('click', function() {
@@ -102,11 +106,111 @@ $('#table_zones').on('click', '.zone .zoneAction[data-action=remove]', function(
   modifyWithoutSave = true
 })
 
+/* Mise à jour du selecteur de zone */
+function buildSelectZone() {
+  preSelected = $('#selectZone').val()
+  $('#selectZone').empty()
+  options = ''
+  $('#table_zones tbody tr').each(function(index) {
+    zoneId = $(this).find('[data-l1key=id]').value()
+    zoneName = $(this).find('[data-l1key=name]').value()
+    selected = (preSelected == zoneId) ? 'selected' : ''
+    options += '<option value="' + zoneId + '" ' + selected + '>' + zoneName + '</option>'
+  })
+  $('#selectZone').append(options)
+}
+
+/* changement du type de vue des schedules */
+$('input[name=selectvue]').on('change', function() {
+  value = $(this).val()
+  if (value == 'jour') {
+    $('#selectionZone').addClass('hidden')
+    $('#selectionJour').removeClass('hidden')
+    $('#selectJour').trigger('change')
+  } else if (value == 'zone'){
+    buildSelectZone()
+    $('#selectionJour').addClass('hidden')
+    $('#selectionZone').removeClass('hidden')
+    $('#selectZone').trigger('change')
+  }
+})
+
+/* Changement de jour à montrer */
+$('#selectJour').on('change', function() {
+  if ($('input[name=selectvue]:checked').val() != 'jour') {
+    return
+  }
+  selected = $('#selectJour').val()
+  $('#table_schedules [data-jour]').each(function(){
+    if ($(this).data('jour') == selected) {
+      $(this).html($(this).data('zonename'))
+      $(this).show()
+    } else {
+      $(this).hide()
+    }
+  })
+})
+
+/* Changement de zone à montrer */
+$('#selectZone').on('change', function() {
+  if ($('input[name=selectvue]:checked').val() != 'zone') {
+    return
+  }
+  selected = $('#selectZone').val()
+  $('#table_schedules [data-zoneid]').each(function(){
+    if ($(this).data('zoneid') == selected) {
+      $(this).html($(this).data('jourtxt'))
+      $(this).show()
+    } else {
+      $(this).hide()
+  }
+  })
+})
+
 /* Renseignement de la table des zones */
 function printEqLogic(data) {
+  $('#table_zones tbody').empty()
   for (zone of data.configuration.zones) {
     addZoneToTable (zone)
   }
+  jours = {
+    'lun': '{{lundi}}',
+    'mar': '{{mardi}}',
+    'mer': '{{mercredi}}',
+    'jeu': '{{jeudi}}',
+    'ven': '{{vendredi}}',
+    'sam': '{{samedi}}',
+    'dim': '{{dimanche}}'
+  }
+  tr = '<tr>'
+  tr += '<th>{{Heure}}</th>'
+  $('#table_zones tbody tr').each(function(index) {
+    zoneId = $(this).find('[data-l1key=id]').value()
+    zoneName = $(this).find('[data-l1key=name]').value()
+    for (jour in jours) {
+      tr += '<th data-jour="' + jour + '" data-jourtxt="' + jours[jour] + '" data-zoneId="' + zoneId + '" data-zoneName="' + zoneName + '"></th>'
+    }
+  })
+  tr += '</tr>'
+  $('#table_schedules thead').empty().append(tr)
+  for (heure = 0; heure < 24; heure++) {
+    for (minute of ['00', '30']) {
+      tr = '<tr>'
+      tr += '<td>' + heure + ':' + minute + '</td>'
+      $('#table_zones tbody tr').each(function(index) {
+        zoneId = $(this).find('[data-l1key=id]').value()
+        for (jour in jours) {
+          tr += '<td data-time="' + heure + ':' + minute + '" data-jour="' + jour + '" data-zoneId="' + zoneId + '">'
+          tr += '<input class="schedAttr form-control input-sm" data-l1key="consigne">'
+          tr += '</td>'
+        }
+      })
+      tr += '</tr>'
+      $('#table_schedules thead').append(tr)
+    }
+  }
+  $('#selectJour').trigger('change')
+  $('#selectZone').trigger('change')
 }
 
 function addZoneToTable(_zone) {
@@ -138,7 +242,6 @@ function addZoneToTable(_zone) {
     })
     _zone.id=nextId
   }
-  console.log(_zone.id)
   var tr = '<tr class="zone">'
   tr += '<td class="hidden-xs">'
   tr += '<span class="zoneAttr" data-l1key="id"></span>'
@@ -210,7 +313,7 @@ function addCmdToTable(_cmd) {
   tr += '</div>'
   tr += '</td>'
   tr += '<td>';
-  tr += '<span class="cmdAttr" data-l1key="htmlstate"></span>'; 
+  tr += '<span class="cmdAttr" data-l1key="htmlstate"></span>';
   tr += '</td>';
   tr += '<td>'
   if (is_numeric(_cmd.id)) {

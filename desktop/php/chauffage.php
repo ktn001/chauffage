@@ -189,7 +189,56 @@ $eqLogics = eqLogic::byType($plugin->getId());
 
 	    <!-- Onglet des schedules -->
 	    <div role="tabpanel" class="tab-pane" id="scheduletab">
-		COUCOU
+		<br>
+		<div class="col-sm-6">
+		    <div class="col-sm-6">
+			<form class="form-vertical">
+			    <fieldset>
+				<label class="control-label">{{Vue}}:
+				    <div class="form-group">
+					<label class="radio-inline control-label" for="selectvue-jour">
+					    <input id="selectvue-jour" type="radio" name="selectvue" value="jour" checked/>
+					    Jour
+					</label>
+					<label class="radio-inline control-label" for="selectvue-zone">
+					    <input id="selectvue-zone" type="radio" name="selectvue" value="zone"/>
+					    Zone
+					</label>
+				    </div>
+				</label>
+			    </fieldset>
+			</form>
+		    </div>
+		    <div class="form-group col-sm-6">
+			<form class="form-vertical">
+			    <fieldset>
+				<label id="selectionJour" class="control-label">{{Jour}}:
+				    <select id="selectJour" class="form-control">
+					<option value='lun'>{{lundi}}</option>
+					<option value='mar'>{{mardi}}</option>
+					<option value='mer'>{{mercredi}}</option>
+					<option value='jeu'>{{jeudi}}</option>
+					<option value='ven'>{{vendredi}}</option>
+					<option value='sam'>{{samedi}}</option>
+					<option value='dim'>{{dimanche}}</option>
+				    </select>
+				</label>
+				<label id="selectionZone" class="control-label hidden">{{Zone}}:
+				    <select id="selectZone" class="form-control">
+				    </select>
+				</label>
+			    </fieldset>
+			</form>
+		    </div>
+		    <div class="table-responsive col-sm-12">
+			<table id="table_schedules" class="table table-bordered table-condensed">
+			    <thead>
+			    </thead>
+			    <tbody>
+			    </tbody>
+			</table>
+		    </div>
+		</div>
 	    </div><!-- /.tabpanel #scheduletab-->
 
 	</div><!-- /.tab-content -->
@@ -198,5 +247,6 @@ $eqLogics = eqLogic::byType($plugin->getId());
 
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'chauffage', 'js', 'chauffage');?>
+<?php include_file('desktop', 'chauffage', 'css', 'chauffage');?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js');?>
