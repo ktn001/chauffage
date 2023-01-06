@@ -1,13 +1,43 @@
-#table_schedules  {
+#table_schedules,
+#table_absences {
 	width: auto;
 	margin-left: auto;
 	margin-right: auto;
 }
 
+#table_schedules th,
+#table_absences th {
+	text-align : center;
+}
+
 #table_schedules td {
 	padding: 1px;
 }
+
+#table_schedules td.scheduletime {
+	text-align : right;
+	padding-right : 7px;
+}
+
 #table_schedules input {
-	padding: 1px 5px;
-	width: 60px
+	text-align : center;
+	padding: 0px;
+	width: 60px;
+}
+
+#table_schedules input.errorConsigne {
+	color: red !important;
+}
+
+#table_absences th:not(:last-child) {
+	width: 140px;
+}
+
+#table_absences td input {
+	width: 130px;
+}
+
+#table_absences th:last-child,
+#table_absences td:last-child {
+	width: 35px;
 }

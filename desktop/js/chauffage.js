@@ -14,6 +14,16 @@
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
 
+$(function() {
+  $.datetimepicker.setLocale(jeedom_langage.substr(0,2))
+  console.log(jeedom.theme.default_bootstrap_theme)
+  console.log(jeedom.theme.default_bootstrap_theme.toLowerCase())
+  datetimepicker_theme = ''
+  if (jeedom.theme.default_bootstrap_theme.toLowerCase().includes('dark')){
+    datetimepicker_theme = 'dark'
+  }
+})
+
 /* Permet la réorganisation des commandes dans l'équipement */
 $("#table_cmd").sortable({
   axis: "y",
@@ -68,7 +78,7 @@ $('.cmdAction[data-action=add-info').on('click', function() {
   })
 })
 
-/* choix d'une info pour les calculs */
+/* Choix d'une info pour les calculs */
 $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   var el = $(this)
   jeedom.cmd.getSelectModal({ cmd: {type: 'info' } }, function(result) {
@@ -77,12 +87,94 @@ $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   })
 })
 
-/* Complète les données à enregister en y ajoutant les zones */
+/* Récupère toutes les consignes dans un array */
+function schedulesFromTable() {
+  let schedules = {}
+  $('#table_schedules .schedAttr[data-l1key=consigne]').each(function(){
+    consigne = $(this).val().trim()
+    if (consigne.length > 0) {
+      zoneId = $(this).closest('td').data('zoneid')
+      key =  $(this).closest('td').data('sched_key')
+      if (! isset(schedules[zoneId])) {
+        schedules[zoneId] = {}
+      }
+      schedules[zoneId][key] = consigne
+    }
+  })
+  return schedules
+}
+
+/* Construction de la table des schedules */
+function buildSchedulesTable() {
+  jours = {
+    '0': '{{lun}}',
+    '1': '{{mar}}',
+    '2': '{{mer}}',
+    '3': '{{jeu}}',
+    '4': '{{ven}}',
+    '5': '{{sam}}',
+    '6': '{{dim}}'
+  }
+  tr = '<tr>'
+  tr += '<th>{{Heure}}</th>'
+  $('#table_zones tbody tr').each(function(index) {
+    zoneId = $(this).find('[data-l1key=id]').value()
+    zoneName = $(this).find('[data-l1key=name]').value()
+    for (jour in jours) {
+      tr += '<th data-jour="' + jour + '" data-jourtxt="' + jours[jour] + '" data-zoneId="' + zoneId + '" data-zoneName="' + zoneName + '"></th>'
+    }
+  })
+  tr += '</tr>'
+  $('#table_schedules thead').empty().append(tr)
+  $('#table_schedules tbody').empty()
+  for (heure = 0; heure < 24; heure++) {
+    for (minute of ['00', '30']) {
+      tr = '<tr>'
+      tr += '<td class="scheduletime">' + heure + ':' + minute + '</td>'
+      $('#table_zones tbody tr').each(function(index) {
+        zoneId = $(this).find('[data-l1key=id]').value()
+        for (jour in jours) {
+          tr += '<td data-sched_key="' + jour + String(heure).padStart(2,'0') + String(minute).padStart(2,'0') + '" data-jour="' + jour + '" data-zoneId="' + zoneId + '">'
+          tr += '<input class="schedAttr form-control input-sm" data-l1key="consigne">'
+          tr += '</td>'
+        }
+      })
+      tr += '</tr>'
+      $('#table_schedules tbody').append(tr)
+    }
+  }
+}
+
+/* Restore des sechdules dans la table */
+function fillSchedulesTable(schedules) {
+  for (zoneId in schedules) {
+    for (time in schedules[zoneId]) {
+      let consigne = schedules[zoneId][time]
+      $('#table_schedules td[data-zoneId=' + zoneId + '][data-sched_key=' + time + '] input.schedAttr[data-l1key]').val(consigne)
+    }
+  }
+}
+
+/* Reconstuction de la table des schedules avec conservation des données */
+function rebuildSchedulesTable() {
+  let schedules = schedulesFromTable()
+  buildSchedulesTable()
+  fillSchedulesTable(schedules)
+    if ($('input[name=selectvue]:checked').val() == 'zone') {
+      $('#selectZone').trigger('change')
+  } else if ($('input[name=selectvue]:checked').val() == 'jour') {
+    $('#selectJour').trigger('change')
+  }
+}
+
+/* Complète les données à enregister en y ajoutant les zones les schedules et les absences */
 function saveEqLogic(eqLogic){
   if (!isset(eqLogic.configuration)) {
     eqLogic.configuration = {}
   }
   eqLogic.configuration.zones = $('.zone').getValues('.zoneAttr')
+  eqLogic.configuration.schedules = schedulesFromTable()
+  eqLogic.configuration.absences = $('.absence').getValues('.absenceAttr')
   return eqLogic
 }
 
@@ -92,6 +184,7 @@ $('#table_zones').on('change sortstop', function(){
   if ($('input[name=selectvue]:checked').val() == 'zone') {
     buildSelectZone()
   }
+  rebuildSchedulesTable()
 })
 
 /* Bouton d'ajout d'une zone */
@@ -122,7 +215,7 @@ function buildSelectZone() {
 
 /* changement du type de vue des schedules */
 $('input[name=selectvue]').on('change', function() {
-  value = $(this).val()
+  let value = $(this).val()
   if (value == 'jour') {
     $('#selectionZone').addClass('hidden')
     $('#selectionJour').removeClass('hidden')
@@ -173,45 +266,23 @@ function printEqLogic(data) {
   for (zone of data.configuration.zones) {
     addZoneToTable (zone)
   }
-  jours = {
-    'lun': '{{lundi}}',
-    'mar': '{{mardi}}',
-    'mer': '{{mercredi}}',
-    'jeu': '{{jeudi}}',
-    'ven': '{{vendredi}}',
-    'sam': '{{samedi}}',
-    'dim': '{{dimanche}}'
-  }
-  tr = '<tr>'
-  tr += '<th>{{Heure}}</th>'
-  $('#table_zones tbody tr').each(function(index) {
-    zoneId = $(this).find('[data-l1key=id]').value()
-    zoneName = $(this).find('[data-l1key=name]').value()
-    for (jour in jours) {
-      tr += '<th data-jour="' + jour + '" data-jourtxt="' + jours[jour] + '" data-zoneId="' + zoneId + '" data-zoneName="' + zoneName + '"></th>'
-    }
-  })
-  tr += '</tr>'
-  $('#table_schedules thead').empty().append(tr)
-  for (heure = 0; heure < 24; heure++) {
-    for (minute of ['00', '30']) {
-      tr = '<tr>'
-      tr += '<td>' + heure + ':' + minute + '</td>'
-      $('#table_zones tbody tr').each(function(index) {
-        zoneId = $(this).find('[data-l1key=id]').value()
-        for (jour in jours) {
-          tr += '<td data-time="' + heure + ':' + minute + '" data-jour="' + jour + '" data-zoneId="' + zoneId + '">'
-          tr += '<input class="schedAttr form-control input-sm" data-l1key="consigne">'
-          tr += '</td>'
-        }
-      })
-      tr += '</tr>'
-      $('#table_schedules thead').append(tr)
-    }
-  }
+  buildSchedulesTable()
+  fillSchedulesTable(data.configuration.schedules)
   $('#selectJour').trigger('change')
   $('#selectZone').trigger('change')
+  for (absence of data.configuration.absences) {
+    addAbsenceToTable(absence)
+  }
 }
+
+/* Validation de la syntaxe d'une consigne */
+$('#table_schedules').delegate('input.schedAttr[data-l1key=consigne]','keyup',function() {
+  if ($(this).val().match(/^\s*(\d+(\.\d*)?)?\s*$/)) {
+    $(this).removeClass("errorConsigne")
+  } else {
+    $(this).addClass("errorConsigne")
+  }
+})
 
 function addZoneToTable(_zone) {
   if (!isset(_zone)){
@@ -236,7 +307,6 @@ function addZoneToTable(_zone) {
           $.fn.showAlert({message: data.result, level: 'danger'})
           return ""
         }
-        console.log(data.result);
         nextId = data.result
       }
     })
@@ -339,3 +409,48 @@ function addCmdToTable(_cmd) {
     }
   })
 }
+
+/* Ajout d'une absence */
+$('.absenceAction[data-action=add]').on('click',function() {
+  addAbsenceToTable()
+})
+
+function addAbsenceToTable(_absence) {
+  let tr = '<tr class="absence">'
+  tr += '<td>'
+  tr += '<input type="text" class="absenceAttr datetimepicker" data-l1key="du"/>'
+  tr += '</td>'
+  tr += '<td>'
+  tr += '<input type="text" class="absenceAttr datetimepicker" data-l1key="au"/>'
+  tr += '</td>'
+  tr += '<td>'
+  tr += '<i class="fas fa-minus-circle pull-right absenceAction cursor" data-action="remove" title="{{Supprimer l\'absence}}"></i></td>'
+  tr += '</td>'
+  tr += '</tr>'
+  $('#table_absences tbody').append(tr)
+  tr = $('#table_absences tbody tr').last()
+  tr.find('.datetimepicker').each(function () {
+    $(this).datetimepicker({
+      step: 30,
+      dayOfWeekStart : 1,
+      theme : datetimepicker_theme,
+      minDate: Date.now(),
+      format: 'd/m/Y H:i:s',
+    })
+  })
+  if (isset(_absence)){
+    tr.setValues(_absence, '.absenceAttr')
+  }
+}
+
+/* Changement de date de début d'absence */
+$('#table_absences tbody').on('change','.absenceAttr[data-l1key=du]', function(e) {
+  console.log($(this).datetimepicker('getValue'))
+  fromDate = $(this).datetimepicker('getValue')
+  $(this).closest('tr').find('.absenceAttr[data-l1key=au]').datetimepicker('setOptions',{minDate:fromDate})
+})
+
+/* Suppression d'une absence */
+$('#table_absences tbody').on('click','.absenceAction[data-action=remove]', function() {
+  $(this).closest('tr').remove()
+})
