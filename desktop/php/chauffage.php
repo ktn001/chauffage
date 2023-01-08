@@ -174,6 +174,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                 <th class="hidden-xs" style="min-width:50px;width:70px;">ID</th>
                                 <th style="min-width:150px;width:300px;">{{Nom}}</th>
                                 <th style="width:130px;">{{Type}}</th>
+                                <th style="width:110px;">{{LogicalId}}</th>
                                 <th style="min-width:180px;">{{Valeur}}</th>
                                 <th style="min-width:260px;width:310px">{{Zone}}</th>
                                 <th style="min-width:260px;width:310px">{{Options}}</th>
@@ -215,13 +216,13 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                 <fieldset>
                                     <label id="selectionJour" class="control-label">{{Jour}}:
                                         <select id="selectJour" class="form-control">
-                                            <option value='0'>{{lundi}}</option>
-                                            <option value='1'>{{mardi}}</option>
-                                            <option value='2'>{{mercredi}}</option>
-                                            <option value='3'>{{jeudi}}</option>
-                                            <option value='4'>{{vendredi}}</option>
-                                            <option value='5'>{{samedi}}</option>
-                                            <option value='6'>{{dimanche}}</option>
+                                            <option value='1'>{{lundi}}</option>
+                                            <option value='2'>{{mardi}}</option>
+                                            <option value='3'>{{mercredi}}</option>
+                                            <option value='4'>{{jeudi}}</option>
+                                            <option value='5'>{{vendredi}}</option>
+                                            <option value='6'>{{samedi}}</option>
+                                            <option value='7'>{{dimanche}}</option>
                                         </select>
                                     </label>
                                     <label id="selectionZone" class="control-label hidden">{{Zone}}:

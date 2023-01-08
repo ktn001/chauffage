@@ -37,8 +37,12 @@ class chauffage extends eqLogic {
 
 	/*
 	* Fonction exécutée automatiquement toutes les minutes par Jeedom
-	public static function cron() {}
 	*/
+	public static function cron() {
+		foreach (self::byType(__CLASS__,true) as $chauffage) {
+			$chauffage->setConsigne();
+		}
+	}
 
 	/*
 	* Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
@@ -109,6 +113,33 @@ class chauffage extends eqLogic {
 
 	// Fonction exécutée automatiquement avant la sauvegarde (création ou mise à jour) de l'équipement
 	public function preSave() {
+		$schedules = $this->getConfiguration('schedules');
+		foreach ($schedules as $schedule) {
+			if (preg_match('/^\d+(\.\d*)?$/',$schedule['consigne']) != 1) {
+				throw new Exception(__("Une consigne n'est pas une valeur numérique",__FILE__));
+			}
+		}
+		foreach ($this->getConfiguration('absences') as $absence) {
+			$du = DateTime::createFromFormat("d/m/Y H:i:s", $absence['du'])->getTimeStamp();
+			$au = DateTime::createFromFormat("d/m/Y H:i:s", $absence['au'])->getTimeStamp();
+			if ($au <= $du) {
+				throw new Exception(__("La fin d'une période d'absence doit être postérieure à son début!",__FILE__));
+			}
+		}
+		foreach ($this->getConfiguration('zones') as $zone) {
+			$cmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'consigne_' . $zone['id']);
+			if (! is_object($cmd)){
+				$cmd = new chauffageCmd();
+				$cmd->setEqLogic_id($this->getId());
+				$cmd->setIsVisible(1);
+				$cmd->setName('consigne_' . $zone['name']);
+				$cmd->setType('info');
+				$cmd->setSubType('numeric');
+				$cmd->setLogicalId('consigne_' . $zone['id']);
+				$cmd->setUnite('°C');
+				$cmd->save();
+			}
+		}
 	}
 
 	// Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
@@ -156,6 +187,55 @@ class chauffage extends eqLogic {
 	}
 	*/
 
+	/*     * *********************Methode d'instance************************* */
+
+	private function zoneConsigne($zoneId) {
+		$now = strftime("%u%H%M");
+		$activeSchedule = [];
+		$nextSchedule = [];
+		$lastSchedule = [];
+		$firstSchedule = [];
+		foreach ($this->getConfiguration('schedules') as $schedule){
+			if ($schedule['zoneid'] != $zoneId){
+				continue;
+			}
+			if ($schedule['key'] <= $now) {
+				if (! $activeSchedule || $schedule['key'] > $activeSchedule['key']) {
+					$activeSchedule = $schedule;
+				}
+			} else {
+				if (! $nextSchedule || $schedule['key'] < $nextSchedule['key']) {
+					$nextSchedule = $schedule;
+				}
+			}
+			if (! $firstSchedule || $schedule['key'] < $firstSchedule['key']) {
+				$firstSchedule = $schedule;
+			}
+			if (! $lastSchedule || $schedule['key'] > $lastSchedule['key']) {
+				$lastSchedule = $schedule;
+			}
+		}
+		if (! $activeSchedule) {
+			$activeSchedule = $lastSchedule;
+		}
+		if (! $nextSchedule) {
+			$nextSchedule = $firstSchedule;
+		}
+		$this->checkAndUpdateCmd('consigne_' . $zoneId,$activeSchedule['consigne']);
+		return $activeSchedule['consigne'];
+	}
+
+	public function setConsigne() {
+		$consignes = [];
+		foreach ($this->getConfiguration('zones') as $zone) {
+			if ($zone['isEnable'] != 1) {
+				continue;
+			}
+			log::add("chauffage","info","zone :" . $zone['name']);
+			$consignes['id'] = $this->zoneConsigne($zone['id']);
+		}
+	}
+
 	/*     * **********************Getteur Setteur*************************** */
 
 }
@@ -175,9 +255,6 @@ class chauffageCmd extends cmd {
 	
 	/* Permet d'empêcher la suppression des commandes même si elles ne sont pas dans la nouvelle configuration de l'équipement envoyé en JS */
 	public function dontRemoveCmd() {
-		if (in_array($this->getLogicalId(),['consigne','refresh'])) {
-			return true;
-		}
 		return false;
 	}
 	
@@ -224,7 +301,7 @@ class chauffageCmd extends cmd {
 			try {
 				return jeedom::evaluateExpression($this->getConfiguration('calcul'));
 			} catch (Exception $e) {
-				log::add('chaffage', 'info', $e->getMessage());
+				log::add('chauffage', 'info', $e->getMessage());
 				return $this->getConfiguration('calcul');
 			}
 		}

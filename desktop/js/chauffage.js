@@ -16,8 +16,6 @@
 
 $(function() {
   $.datetimepicker.setLocale(jeedom_langage.substr(0,2))
-  console.log(jeedom.theme.default_bootstrap_theme)
-  console.log(jeedom.theme.default_bootstrap_theme.toLowerCase())
   datetimepicker_theme = ''
   if (jeedom.theme.default_bootstrap_theme.toLowerCase().includes('dark')){
     datetimepicker_theme = 'dark'
@@ -89,16 +87,15 @@ $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
 
 /* Récupère toutes les consignes dans un array */
 function schedulesFromTable() {
-  let schedules = {}
+  let schedules = []
   $('#table_schedules .schedAttr[data-l1key=consigne]').each(function(){
     consigne = $(this).val().trim()
     if (consigne.length > 0) {
-      zoneId = $(this).closest('td').data('zoneid')
-      key =  $(this).closest('td').data('sched_key')
-      if (! isset(schedules[zoneId])) {
-        schedules[zoneId] = {}
-      }
-      schedules[zoneId][key] = consigne
+      schedule = {}
+      schedule.key = $(this).closest('td').data('sched_key')
+      schedule.zoneid = $(this).closest('td').data('zoneid')
+      schedule.consigne = consigne
+      schedules.push(schedule)
     }
   })
   return schedules
@@ -107,13 +104,13 @@ function schedulesFromTable() {
 /* Construction de la table des schedules */
 function buildSchedulesTable() {
   jours = {
-    '0': '{{lun}}',
-    '1': '{{mar}}',
-    '2': '{{mer}}',
-    '3': '{{jeu}}',
-    '4': '{{ven}}',
-    '5': '{{sam}}',
-    '6': '{{dim}}'
+    '1': '{{lun}}',
+    '2': '{{mar}}',
+    '3': '{{mer}}',
+    '4': '{{jeu}}',
+    '5': '{{ven}}',
+    '6': '{{sam}}',
+    '7': '{{dim}}'
   }
   tr = '<tr>'
   tr += '<th>{{Heure}}</th>'
@@ -147,11 +144,8 @@ function buildSchedulesTable() {
 
 /* Restore des sechdules dans la table */
 function fillSchedulesTable(schedules) {
-  for (zoneId in schedules) {
-    for (time in schedules[zoneId]) {
-      let consigne = schedules[zoneId][time]
-      $('#table_schedules td[data-zoneId=' + zoneId + '][data-sched_key=' + time + '] input.schedAttr[data-l1key]').val(consigne)
-    }
+  for (schedule of schedules) {
+    $('#table_schedules td[data-zoneId=' + schedule.zoneid + '][data-sched_key=' + schedule.key + '] input.schedAttr[data-l1key]').val(schedule.consigne)
   }
 }
 
@@ -345,7 +339,6 @@ function addCmdToTable(_cmd) {
   var tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
   tr += '<td class="hidden-xs">'
   tr += '<span class="cmdAttr" data-l1key="id"></span>'
-  tr += '<span class="cmdAttr hidden" data-l1key="logicalId"></span>'
   tr += '</td>'
   tr += '<td>'
   tr += '<div class="input-group">'
@@ -362,13 +355,16 @@ function addCmdToTable(_cmd) {
   tr += '<span class="subType" subType="' + init(_cmd.subType) + '"></span>'
   tr += '</td>'
   tr += '<td>'
-  if (! ['consigne'].includes(init(_cmd.logicalId))) {
+  tr += '<input class="tooltips cmdAttr form-control input-sm disabled" data-l1key="logicalId">'
+  tr += '</td>'
+  tr += '<td>'
+  if ( _cmd.logicalId.substring(0,9) != 'consigne_'){
     tr += '<textarea class="cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="calcul" style="height:35px;" placeholder="{{Calcul}}"></textarea>'
     tr += '<a class="btn btn-default listEquipementInfo btn-xs" data-input="calcul" style="width:100%;margin-top:2px;"><i class="fas fa-list-alt"></i> {{Rechercher équipement}}</a>'
   }
   tr += '</td>'
   tr += '<td>'
-  if (! ['consigne'].includes(init(_cmd.logicalId))) {
+  if ( _cmd.logicalId.substring(0,9) != 'consigne_'){
     tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="zone" placeholder="{{Zone}}" title="{{Zone}}">'
   }
   tr += '</td>'
@@ -390,9 +386,7 @@ function addCmdToTable(_cmd) {
     tr += '<a class="btn btn-default btn-xs cmdAction" data-action="configure"><i class="fas fa-cogs"></i></a> '
     tr += '<a class="btn btn-default btn-xs cmdAction" data-action="test"><i class="fas fa-rss"></i> Tester</a>'
   }
-  if (! ['consigne'].includes(init(_cmd.logicalId))) {
-    tr += '<i class="fas fa-minus-circle pull-right cmdAction cursor" data-action="remove" title="{{Supprimer la commande}}"></i></td>'
-  }
+  tr += '<i class="fas fa-minus-circle pull-right cmdAction cursor" data-action="remove" title="{{Supprimer la commande}}"></i></td>'
   tr += '</tr>'
   $('#table_cmd tbody').append(tr)
   var tr = $('#table_cmd tbody tr').last()
@@ -445,7 +439,6 @@ function addAbsenceToTable(_absence) {
 
 /* Changement de date de début d'absence */
 $('#table_absences tbody').on('change','.absenceAttr[data-l1key=du]', function(e) {
-  console.log($(this).datetimepicker('getValue'))
   fromDate = $(this).datetimepicker('getValue')
   $(this).closest('tr').find('.absenceAttr[data-l1key=au]').datetimepicker('setOptions',{minDate:fromDate})
 })
