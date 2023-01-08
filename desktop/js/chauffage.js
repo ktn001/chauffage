@@ -175,9 +175,9 @@ function saveEqLogic(eqLogic){
 /* Sur modification de zone */
 $('#table_zones').on('change sortstop', function(){
   modifyWithoutSave = true
-  if ($('input[name=selectvue]:checked').val() == 'zone') {
-    buildSelectZone()
-  }
+  $('.zoneSelector').each( function() {
+    buildSelectZone($(this))
+  })
   rebuildSchedulesTable()
 })
 
@@ -194,9 +194,9 @@ $('#table_zones').on('click', '.zone .zoneAction[data-action=remove]', function(
 })
 
 /* Mise à jour du selecteur de zone */
-function buildSelectZone() {
-  preSelected = $('#selectZone').val()
-  $('#selectZone').empty()
+function buildSelectZone(selecteur) {
+  preSelected = selecteur.val()
+  selecteur.empty()
   options = ''
   $('#table_zones tbody tr').each(function(index) {
     zoneId = $(this).find('[data-l1key=id]').value()
@@ -204,7 +204,7 @@ function buildSelectZone() {
     selected = (preSelected == zoneId) ? 'selected' : ''
     options += '<option value="' + zoneId + '" ' + selected + '>' + zoneName + '</option>'
   })
-  $('#selectZone').append(options)
+  selecteur.append(options)
 }
 
 /* changement du type de vue des schedules */
@@ -215,7 +215,7 @@ $('input[name=selectvue]').on('change', function() {
     $('#selectionJour').removeClass('hidden')
     $('#selectJour').trigger('change')
   } else if (value == 'zone'){
-    buildSelectZone()
+    buildSelectZone($('#selectZone'))
     $('#selectionJour').addClass('hidden')
     $('#selectionZone').removeClass('hidden')
     $('#selectZone').trigger('change')
@@ -250,7 +250,7 @@ $('#selectZone').on('change', function() {
       $(this).show()
     } else {
       $(this).hide()
-  }
+    }
   })
 })
 
@@ -336,6 +336,17 @@ function addCmdToTable(_cmd) {
   if (init(_cmd.logicalId) == 'refresh') {
     return
   }
+  if ( _cmd.logicalId.search(/^(consigne|delta)_/) != -1){
+	  typeDisabled = true
+	  subTypeDisabled = true
+	  zoneDisabled = true
+	  showCalcul = false
+  } else {
+	  typeDisabled = false
+	  subTypeDisabled = false
+	  zoneDisabled = false
+	  showCalcul = true
+  }
   var tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
   tr += '<td class="hidden-xs">'
   tr += '<span class="cmdAttr" data-l1key="id"></span>'
@@ -351,22 +362,28 @@ function addCmdToTable(_cmd) {
   tr += '</select>'
   tr += '</td>'
   tr += '<td>'
-  tr += '<span class="type" type="' + init(_cmd.type) + '">' + jeedom.cmd.availableType() + '</span>'
-  tr += '<span class="subType" subType="' + init(_cmd.subType) + '"></span>'
+  if (typeDisabled) {
+    tr += '<input class="cmdAttr form-control input-sm disabled" data-l1key="type"/>'
+  } else {
+    tr += '<span class="type" type="' + init(_cmd.type) + '">' + jeedom.cmd.availableType() + '</span>'
+  }
+  if (subTypeDisabled) {
+    tr += '<input class="cmdAttr form-control input-sm disabled" data-l1key="subType"/>'
+  } else {
+    tr += '<span class="subType" subType="' + init(_cmd.subType) + '"></span>'
+  }
   tr += '</td>'
   tr += '<td>'
   tr += '<input class="tooltips cmdAttr form-control input-sm disabled" data-l1key="logicalId">'
   tr += '</td>'
   tr += '<td>'
-  if ( _cmd.logicalId.substring(0,9) != 'consigne_'){
+  if (showCalcul) {
     tr += '<textarea class="cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="calcul" style="height:35px;" placeholder="{{Calcul}}"></textarea>'
     tr += '<a class="btn btn-default listEquipementInfo btn-xs" data-input="calcul" style="width:100%;margin-top:2px;"><i class="fas fa-list-alt"></i> {{Rechercher équipement}}</a>'
   }
   tr += '</td>'
   tr += '<td>'
-  if ( _cmd.logicalId.substring(0,9) != 'consigne_'){
-    tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="zone" placeholder="{{Zone}}" title="{{Zone}}">'
-  }
+  tr += '<select class="cmdAttr form-control input-sm zoneSelector" data-l1key="configuration" data-l2key="zoneId"></select>'
   tr += '</td>'
   tr += '<td>'
   tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isVisible" checked/>{{Afficher}}</label> '
@@ -390,6 +407,7 @@ function addCmdToTable(_cmd) {
   tr += '</tr>'
   $('#table_cmd tbody').append(tr)
   var tr = $('#table_cmd tbody tr').last()
+  buildSelectZone(tr.find('.zoneSelector'))
   jeedom.eqLogic.buildSelectCmd({
     id:  $('.eqLogicAttr[data-l1key=id]').value(),
     filter: {type: 'info'},

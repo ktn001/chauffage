@@ -40,7 +40,7 @@ class chauffage extends eqLogic {
 	*/
 	public static function cron() {
 		foreach (self::byType(__CLASS__,true) as $chauffage) {
-			$chauffage->setConsigne();
+			$chauffage->setConsignes();
 		}
 	}
 
@@ -126,9 +126,14 @@ class chauffage extends eqLogic {
 				throw new Exception(__("La fin d'une période d'absence doit être postérieure à son début!",__FILE__));
 			}
 		}
+	}
+
+	// Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
+	public function postSave() {
 		foreach ($this->getConfiguration('zones') as $zone) {
 			$cmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'consigne_' . $zone['id']);
 			if (! is_object($cmd)){
+				log::add("chauffage","info",__(sprintf("%s: Création de la commande '%s'", $this->getHumanName(), "consigne_" . $zone['id']),__FILE__));
 				$cmd = new chauffageCmd();
 				$cmd->setEqLogic_id($this->getId());
 				$cmd->setIsVisible(1);
@@ -136,14 +141,52 @@ class chauffage extends eqLogic {
 				$cmd->setType('info');
 				$cmd->setSubType('numeric');
 				$cmd->setLogicalId('consigne_' . $zone['id']);
+				$cmd->setConfiguration('zoneId',$zone['id']);
+				$cmd->setUnite('°C');
+				$cmd->save();
+			}
+			$cmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'delta_' . $zone['id']);
+			if (! is_object($cmd)){
+				log::add("chauffage","info",__(sprintf("%s: Création de la commande '%s'", $this->getHumanName(), "delta_" . $zone['id']),__FILE__));
+				$cmd = new chauffageCmd();
+				$cmd->setEqLogic_id($this->getId());
+				$cmd->setIsVisible(1);
+				$cmd->setName('delta_' . $zone['name']);
+				$cmd->setType('info');
+				$cmd->setSubType('numeric');
+				$cmd->setLogicalId('delta_' . $zone['id']);
+				$cmd->setConfiguration('zoneId',$zone['id']);
 				$cmd->setUnite('°C');
 				$cmd->save();
 			}
 		}
 	}
 
-	// Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
-	public function postSave() {
+	// Fonction excécutée apès sauvegarde de l'eqLogic et des commandes
+	public function postAjax() {
+		foreach ($this->getConfiguration('zones') as $zone) {
+			$foundValues = [];
+			foreach ($this->getCmd('info') as $cmd) {
+				if ($cmd->getConfiguration('zoneId') != $zone['id']){
+					continue;
+				}
+				if ($cmd->getLogicalId() == 'delta_' . $zone['id']) {
+					continue;
+				}
+				$foundValues[] = $cmd->getId();
+			}
+			$deltaCmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'delta_' . $zone['id']);
+			if (! is_object($deltaCmd)){
+				log::add("chauffage","warning",__(sprintf("%s : commande %s introuvable",$this->getHumanName(), 'delta_' . $zone['id']),__FILE__));
+			}
+			$oldValue = $deltaCmd->getValue();
+			$newValue = '';
+			foreach ($foundValues as $foundValue) {
+				$newValue .= '#' . $foundValue . '#';
+			}
+			$deltaCmd->setValue($newValue);
+			$deltaCmd->save();
+		}
 	}
 
 	// Fonction exécutée automatiquement avant la suppression de l'équipement
@@ -154,42 +197,7 @@ class chauffage extends eqLogic {
 	public function postRemove() {
 	}
 
-	/*
-	* Permet de crypter/décrypter automatiquement des champs de configuration des équipements
-	* Exemple avec le champ "Mot de passe" (password)
-	public function decrypt() {
-		$this->setConfiguration('password', utils::decrypt($this->getConfiguration('password')));
-	}
-	public function encrypt() {
-		$this->setConfiguration('password', utils::encrypt($this->getConfiguration('password')));
-	}
-	*/
-
-	/*
-	* Permet de modifier l'affichage du widget (également utilisable par les commandes)
-	public function toHtml($_version = 'dashboard') {}
-	*/
-
-	/*
-	* Permet de déclencher une action avant modification d'une variable de configuration du plugin
-	* Exemple avec la variable "param3"
-	public static function preConfig_param3( $value ) {
-		// do some checks or modify on $value
-		return $value;
-	}
-	*/
-
-	/*
-	* Permet de déclencher une action après modification d'une variable de configuration du plugin
-	* Exemple avec la variable "param3"
-	public static function postConfig_param3($value) {
-		// no return value
-	}
-	*/
-
-	/*     * *********************Methode d'instance************************* */
-
-	private function zoneConsigne($zoneId) {
+	private function setZoneConsigne($zoneId) {
 		$now = strftime("%u%H%M");
 		$activeSchedule = [];
 		$nextSchedule = [];
@@ -225,14 +233,22 @@ class chauffage extends eqLogic {
 		return $activeSchedule['consigne'];
 	}
 
-	public function setConsigne() {
+	public function zoneExists($zoneId) {
+		foreach ($this->getConfiguration('zones') as $zone) {
+			if ($zone['id'] == $zoneId){
+				return True;
+			}
+		}
+		return False;
+	}
+
+	public function setConsignes() {
 		$consignes = [];
 		foreach ($this->getConfiguration('zones') as $zone) {
 			if ($zone['isEnable'] != 1) {
 				continue;
 			}
-			log::add("chauffage","info","zone :" . $zone['name']);
-			$consignes['id'] = $this->zoneConsigne($zone['id']);
+			$this->setZoneConsigne($zone['id']);
 		}
 	}
 
@@ -255,6 +271,12 @@ class chauffageCmd extends cmd {
 	
 	/* Permet d'empêcher la suppression des commandes même si elles ne sont pas dans la nouvelle configuration de l'équipement envoyé en JS */
 	public function dontRemoveCmd() {
+		if (preg_match('/^(consigne|delta)_(?<zoneid>\d+)$/',$this->getLogicalId(),$matches)){
+			$zoneId = $matches['zoneid'];
+			if ($this->getEqLogic()->zoneExists($zoneId)){
+				return True;
+			}
+		}
 		return false;
 	}
 	
@@ -292,6 +314,7 @@ class chauffageCmd extends cmd {
 	// Exécution d'une commande
 	public function execute($_options = array()) {
 		$eqLogic = $this->getEqLogic();
+		log::add("chauffage","info","execute : " );
 		if ($this->getLogicalId() == 'refresh') {
 			$eqLogic->refresh();
 			return;

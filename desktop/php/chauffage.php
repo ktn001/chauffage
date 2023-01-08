@@ -226,7 +226,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                         </select>
                                     </label>
                                     <label id="selectionZone" class="control-label hidden">{{Zone}}:
-                                        <select id="selectZone" class="form-control">
+                                        <select id="selectZone" class="form-control zoneSelector">
                                         </select>
                                     </label>
                                 </fieldset>
