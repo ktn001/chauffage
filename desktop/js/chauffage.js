@@ -76,6 +76,24 @@ $('.cmdAction[data-action=add-info').on('click', function() {
   })
 })
 
+/* Mise a jour du nom de la zone dans une ligne de la table des commandes */
+function setZoneTexte(tr) {
+  if (tr == undefined) {
+    $('#table_cmd').find('tr').each(function(){
+      setZoneTexte($(this))
+    })
+    return
+  }
+  zoneId = tr.find('.cmdAttr[data-l2key=zoneId]').value()
+  $('#table_zones tbody').find('.zoneAttr[data-l1key=id]').each(function() {
+    if ($(this).html() != zoneId) {
+      return
+    }
+    zoneTexte = $(this).closest('tr').find('[data-l1key=name]').val()
+    tr.find('.zone-text').val(zoneTexte)
+  })
+}
+
 /* Choix d'une info pour les calculs */
 $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   var el = $(this)
@@ -179,6 +197,7 @@ $('#table_zones').on('change sortstop', function(){
     buildSelectZone($(this))
   })
   rebuildSchedulesTable()
+  setZoneTexte()
 })
 
 /* Bouton d'ajout d'une zone */
@@ -267,6 +286,7 @@ function printEqLogic(data) {
   for (absence of data.configuration.absences) {
     addAbsenceToTable(absence)
   }
+  modifyWithoutSave = false
 }
 
 /* Validation de la syntaxe d'une consigne */
@@ -278,6 +298,7 @@ $('#table_schedules').delegate('input.schedAttr[data-l1key=consigne]','keyup',fu
   }
 })
 
+/* Ajout d'une zone dans le table de configuration des zones */
 function addZoneToTable(_zone) {
   if (!isset(_zone)){
     var _zone = {}
@@ -336,16 +357,16 @@ function addCmdToTable(_cmd) {
   if (init(_cmd.logicalId) == 'refresh') {
     return
   }
-  if ( _cmd.logicalId.search(/^(consigne|delta)_/) != -1){
-	  typeDisabled = true
-	  subTypeDisabled = true
-	  zoneDisabled = true
-	  showCalcul = false
+  if ( _cmd.logicalId.search(/^consigne|delta$/) != -1){
+    typeDisabled = true
+    subTypeDisabled = true
+    zoneDisabled = true
+    showCalcul = false
   } else {
-	  typeDisabled = false
-	  subTypeDisabled = false
-	  zoneDisabled = false
-	  showCalcul = true
+    typeDisabled = true
+    subTypeDisabled = false
+    zoneDisabled = false
+    showCalcul = true
   }
   var tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
   tr += '<td class="hidden-xs">'
@@ -357,18 +378,15 @@ function addCmdToTable(_cmd) {
   tr += '<span class="input-group-btn"><a class="cmdAction btn btn-sm btn-default" data-l1key="chooseIcon" title="{{Choisir une icône}}"><i class="fas fa-icons"></i></a></span>'
   tr += '<span class="cmdAttr input-group-addon roundedRight" data-l1key="display" data-l2key="icon" style="font-size:19px;padding:0 5px 0 0!important;"></span>'
   tr += '</div>'
-  tr += '<select class="cmdAttr form-control input-sm" data-l1key="value" style="display:none;margin-top:5px;" title="{{Commande info liée}}">'
-  tr += '<option value="">{{Aucune}}</option>'
-  tr += '</select>'
   tr += '</td>'
   tr += '<td>'
   if (typeDisabled) {
-    tr += '<input class="cmdAttr form-control input-sm disabled" data-l1key="type"/>'
+    tr += '<input class="cmdAttr" form-control type input-sm" data-l1key="type" disabled style="width:120px;margin-bottom:5px;">'
   } else {
     tr += '<span class="type" type="' + init(_cmd.type) + '">' + jeedom.cmd.availableType() + '</span>'
   }
   if (subTypeDisabled) {
-    tr += '<input class="cmdAttr form-control input-sm disabled" data-l1key="subType"/>'
+    tr += '<input class="cmdAttr" form-control type input-sm" data-l1key="subType" disabled style="width:120px">'
   } else {
     tr += '<span class="subType" subType="' + init(_cmd.subType) + '"></span>'
   }
@@ -383,7 +401,12 @@ function addCmdToTable(_cmd) {
   }
   tr += '</td>'
   tr += '<td>'
-  tr += '<select class="cmdAttr form-control input-sm zoneSelector" data-l1key="configuration" data-l2key="zoneId"></select>'
+  if (zoneDisabled) {
+    tr += '<div class="cmdAttr hidden" data-l1key="configuration" data-l2key="zoneId"></div>'
+    tr += '<input class="zone-text form-control input-sm disabled">'
+  } else {
+    tr += '<select class="cmdAttr form-control input-sm zoneSelector" data-l1key="configuration" data-l2key="zoneId"></select>'
+  }
   tr += '</td>'
   tr += '<td>'
   tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isVisible" checked/>{{Afficher}}</label> '
@@ -408,18 +431,9 @@ function addCmdToTable(_cmd) {
   $('#table_cmd tbody').append(tr)
   var tr = $('#table_cmd tbody tr').last()
   buildSelectZone(tr.find('.zoneSelector'))
-  jeedom.eqLogic.buildSelectCmd({
-    id:  $('.eqLogicAttr[data-l1key=id]').value(),
-    filter: {type: 'info'},
-    error: function (error) {
-      $('#div_alert').showAlert({message: error.message, level: 'danger'})
-    },
-    success: function (result) {
-      tr.find('.cmdAttr[data-l1key=value]').append(result)
-      tr.setValues(_cmd, '.cmdAttr')
-      jeedom.cmd.changeType(tr, init(_cmd.subType))
-    }
-  })
+  tr.setValues(_cmd, '.cmdAttr')
+  jeedom.cmd.changeType(tr, init(_cmd.subType))
+  setZoneTexte(tr)
 }
 
 /* Ajout d'une absence */

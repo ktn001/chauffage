@@ -176,7 +176,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                 <th style="width:130px;">{{Type}}</th>
                                 <th style="width:110px;">{{LogicalId}}</th>
                                 <th style="min-width:180px;">{{Valeur}}</th>
-                                <th style="min-width:260px;width:310px">{{Zone}}</th>
+                                <th style="width:160px">{{Zone}}</th>
                                 <th style="min-width:260px;width:310px">{{Options}}</th>
                                 <th>{{Etat}}</th>
                                 <th style="min-width:80px;width:140px;">{{Actions}}</th>

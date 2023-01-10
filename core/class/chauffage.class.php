@@ -21,18 +21,6 @@ require_once __DIR__  . '/../../../../core/php/core.inc.php';
 class chauffage extends eqLogic {
 	/*     * *************************Attributs****************************** */
 
-	/*
-	* Permet de définir les possibilités de personnalisation du widget (en cas d'utilisation de la fonction 'toHtml' par exemple)
-	* Tableau multidimensionnel - exemple: array('custom' => true, 'custom::layout' => false)
-	public static $_widgetPossibility = array();
-	*/
-
-	/*
-	* Permet de crypter/décrypter automatiquement des champs de configuration du plugin
-	* Exemple : "param1" & "param2" seront cryptés mais pas "param3"
-	public static $_encryptConfigKey = array('param1', 'param2');
-	*/
-
 	/*     * ***********************Methode static*************************** */
 
 	/*
@@ -76,10 +64,6 @@ class chauffage extends eqLogic {
 
 	/*     * *********************Méthodes d'instance************************* */
 
-	// Fonction exécutée automatiquement avant la création de l'équipement
-	public function preInsert() {
-	}
-
 	// Fonction exécutée automatiquement après la création de l'équipement
 	public function postInsert() {
 		$refresh = new chauffageCmd();
@@ -90,25 +74,6 @@ class chauffage extends eqLogic {
 		$refresh->setSubType('other');
 		$refresh->setEqLogic_id($this->getId());
 		$refresh->save();
-		$cmd = new chauffageCmd();
-		$cmd->setEqLogic_id($this->getId());
-		$cmd->setIsVisible(1);
-		$cmd->setName('consigne');
-		$cmd->setType('info');
-		$cmd->setSubType('numeric');
-		$cmd->setLogicalId('consigne');
-		$cmd->setConfiguration('minValue',0);
-		$cmd->setConfiguration('maxValue',25);
-		$cmd->setUnite('°C');
-		$cmd->save();
-	}
-
-	// Fonction exécutée automatiquement avant la mise à jour de l'équipement
-	public function preUpdate() {
-	}
-
-	// Fonction exécutée automatiquement après la mise à jour de l'équipement
-	public function postUpdate() {
 	}
 
 	// Fonction exécutée automatiquement avant la sauvegarde (création ou mise à jour) de l'équipement
@@ -131,30 +96,30 @@ class chauffage extends eqLogic {
 	// Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
 	public function postSave() {
 		foreach ($this->getConfiguration('zones') as $zone) {
-			$cmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'consigne_' . $zone['id']);
+			$cmd = $this->getConsigneCmd($zone['id']);
 			if (! is_object($cmd)){
-				log::add("chauffage","info",__(sprintf("%s: Création de la commande '%s'", $this->getHumanName(), "consigne_" . $zone['id']),__FILE__));
+				log::add("chauffage","info",__(sprintf("%s: Création de la commande consigne pour la zone '%s'", $this->getHumanName(), $zone['id']),__FILE__));
 				$cmd = new chauffageCmd();
 				$cmd->setEqLogic_id($this->getId());
 				$cmd->setIsVisible(1);
 				$cmd->setName('consigne_' . $zone['name']);
 				$cmd->setType('info');
 				$cmd->setSubType('numeric');
-				$cmd->setLogicalId('consigne_' . $zone['id']);
+				$cmd->setLogicalId('consigne');
 				$cmd->setConfiguration('zoneId',$zone['id']);
 				$cmd->setUnite('°C');
 				$cmd->save();
 			}
-			$cmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'delta_' . $zone['id']);
+			$cmd = $this->getDeltaCmd($zone['id']);
 			if (! is_object($cmd)){
-				log::add("chauffage","info",__(sprintf("%s: Création de la commande '%s'", $this->getHumanName(), "delta_" . $zone['id']),__FILE__));
+				log::add("chauffage","info",__(sprintf("%s: Création de la commande delty pour la zone '%s'", $this->getHumanName(), $zone['id']),__FILE__));
 				$cmd = new chauffageCmd();
 				$cmd->setEqLogic_id($this->getId());
 				$cmd->setIsVisible(1);
 				$cmd->setName('delta_' . $zone['name']);
 				$cmd->setType('info');
 				$cmd->setSubType('numeric');
-				$cmd->setLogicalId('delta_' . $zone['id']);
+				$cmd->setLogicalId('delta');
 				$cmd->setConfiguration('zoneId',$zone['id']);
 				$cmd->setUnite('°C');
 				$cmd->save();
@@ -170,14 +135,14 @@ class chauffage extends eqLogic {
 				if ($cmd->getConfiguration('zoneId') != $zone['id']){
 					continue;
 				}
-				if ($cmd->getLogicalId() == 'delta_' . $zone['id']) {
+				if ($cmd->getLogicalId() == 'delta') {
 					continue;
 				}
 				$foundValues[] = $cmd->getId();
 			}
-			$deltaCmd = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'delta_' . $zone['id']);
+			$deltaCmd = $this->getDeltaCmd($zone['id']);
 			if (! is_object($deltaCmd)){
-				log::add("chauffage","warning",__(sprintf("%s : commande %s introuvable",$this->getHumanName(), 'delta_' . $zone['id']),__FILE__));
+				log::add("chauffage","warning",__(sprintf("%s : commande %s introuvable",$this->getHumanName(), 'delta'),__FILE__));
 			}
 			$oldValue = $deltaCmd->getValue();
 			$newValue = '';
@@ -187,14 +152,6 @@ class chauffage extends eqLogic {
 			$deltaCmd->setValue($newValue);
 			$deltaCmd->save();
 		}
-	}
-
-	// Fonction exécutée automatiquement avant la suppression de l'équipement
-	public function preRemove() {
-	}
-
-	// Fonction exécutée automatiquement après la suppression de l'équipement
-	public function postRemove() {
 	}
 
 	private function setZoneConsigne($zoneId) {
@@ -229,7 +186,10 @@ class chauffage extends eqLogic {
 		if (! $nextSchedule) {
 			$nextSchedule = $firstSchedule;
 		}
-		$this->checkAndUpdateCmd('consigne_' . $zoneId,$activeSchedule['consigne']);
+		$cmd=$this->getConsigneCmd($zoneId);
+		if (is_object($cmd)){
+			$this->checkAndUpdateCmd($cmd,$activeSchedule['consigne']);
+		}
 		return $activeSchedule['consigne'];
 	}
 
@@ -252,6 +212,32 @@ class chauffage extends eqLogic {
 		}
 	}
 
+	public function getConsigneCmd($zoneId = 0) {
+		$cmds = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'consigne', true);
+		if ($zoneId == 0) {
+			return $cmds;
+		}
+		foreach ($cmds as $cmd) {
+			if ($cmd->getConfiguration("zoneId") == $zoneId) {
+				return $cmd;
+			}
+		}
+		return null;
+	}
+
+	public function getDeltaCmd($zoneId = 0) {
+		$cmds = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'delta', true);
+		if ($zoneId == 0) {
+			return $cmds;
+		}
+		foreach ($cmds as $cmd) {
+			if ($cmd->getConfiguration("zoneId") == $zoneId) {
+				return $cmd;
+			}
+		}
+		return null;
+	}
+
 	/*     * **********************Getteur Setteur*************************** */
 
 }
@@ -271,8 +257,8 @@ class chauffageCmd extends cmd {
 	
 	/* Permet d'empêcher la suppression des commandes même si elles ne sont pas dans la nouvelle configuration de l'équipement envoyé en JS */
 	public function dontRemoveCmd() {
-		if (preg_match('/^(consigne|delta)_(?<zoneid>\d+)$/',$this->getLogicalId(),$matches)){
-			$zoneId = $matches['zoneid'];
+		if ($this->getLogicalId() == 'consigne' || $this->getLogicalId() == 'delta') {
+			$zoneId = $this->getConfiguration('zoneId');
 			if ($this->getEqLogic()->zoneExists($zoneId)){
 				return True;
 			}
@@ -314,13 +300,12 @@ class chauffageCmd extends cmd {
 	// Exécution d'une commande
 	public function execute($_options = array()) {
 		$eqLogic = $this->getEqLogic();
-		log::add("chauffage","info","execute : " );
+		log::add("chauffage","info","execute : " . $this->getHumanName() . "  LogicalId: " . $this->getLogicalId() );
 		if ($this->getLogicalId() == 'refresh') {
 			$eqLogic->refresh();
 			return;
 		}
-		switch ($this->getType()) {
-		case 'info':
+		if ($this->getLogicalId() == 'temperature' || $this->getLogicalId() == 'ouvrant') {
 			try {
 				return jeedom::evaluateExpression($this->getConfiguration('calcul'));
 			} catch (Exception $e) {
@@ -328,6 +313,27 @@ class chauffageCmd extends cmd {
 				return $this->getConfiguration('calcul');
 			}
 		}
+		if ($this->getLogicalId() == 'delta') {
+			$zoneId = $this->getConfiguration('zoneId');
+			log::add("chauffage","debug","zoneId: " . $zoneId);
+			$count = 0;
+			$total = 0;
+			foreach ($eqLogic->getCmd('info') as $cmd) {
+				if  ($cmd->getConfiguration('zoneId') != $zoneId) {
+					continue;
+				}
+				if ($cmd->getLogicalId() != 'temperature') {
+					continue;
+				}
+				$total += $cmd->execCmd();
+				$count++;
+			}
+			if ($count == 0){
+				return "";
+			}
+			return $total/$count; 
+		}
+
 	}
 
 	/*     * **********************Getteur Setteur*************************** */
