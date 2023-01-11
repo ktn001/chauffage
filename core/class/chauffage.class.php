@@ -238,6 +238,20 @@ class chauffage extends eqLogic {
 		return null;
 	}
 
+	public function getTemperatureCmd($zoneId = 0) {
+		$cmds = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'temperature', true);
+		if ($zoneId == 0) {
+			return $cmds;
+		}
+		$cmdsToReturn = [];
+		foreach ($cmds as $cmd) {
+			if ($cmd->getConfiguration("zoneId") == $zoneId) {
+				$cmdsToReturn[] = $cmd;
+			}
+		}
+		return $cmdsToReturn;
+	}
+
 	/*     * **********************Getteur Setteur*************************** */
 
 }
@@ -315,23 +329,23 @@ class chauffageCmd extends cmd {
 		}
 		if ($this->getLogicalId() == 'delta') {
 			$zoneId = $this->getConfiguration('zoneId');
-			log::add("chauffage","debug","zoneId: " . $zoneId);
+			$eqLogic = $this->getEqLogic();
+			$consigneCmd = $eqLogic->getConsigneCmd($zoneId);
+			if (! is_object($consigneCmd)){
+				log::add("chauffage","error",__(sprintf("&s : consigne introuvable pour la zone %s",$eqLogic->getHumanName(),$zoneId),__FILE__));
+				return "";
+			}
+			$consigne = $consigneCmd->execCmd();
 			$count = 0;
 			$total = 0;
-			foreach ($eqLogic->getCmd('info') as $cmd) {
-				if  ($cmd->getConfiguration('zoneId') != $zoneId) {
-					continue;
-				}
-				if ($cmd->getLogicalId() != 'temperature') {
-					continue;
-				}
+			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
 				$total += $cmd->execCmd();
 				$count++;
 			}
 			if ($count == 0){
 				return "";
 			}
-			return $total/$count; 
+			return ($total/$count)-$consigne; 
 		}
 
 	}
