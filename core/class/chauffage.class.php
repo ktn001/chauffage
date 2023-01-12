@@ -25,12 +25,8 @@ class chauffage extends eqLogic {
 
 	/*
 	* Fonction exécutée automatiquement toutes les minutes par Jeedom
+	public static function cron() {}
 	*/
-	public static function cron() {
-		foreach (self::byType(__CLASS__,true) as $chauffage) {
-			$chauffage->setConsignes();
-		}
-	}
 
 	/*
 	* Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
@@ -39,8 +35,12 @@ class chauffage extends eqLogic {
 
 	/*
 	* Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
-	public static function cron10() {}
 	*/
+	public static function cron10() {
+		foreach (self::byType(__CLASS__,true) as $chauffage) {
+			$chauffage->setConsignes();
+		}
+	}
 
 	/*
 	* Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
@@ -152,19 +152,48 @@ class chauffage extends eqLogic {
 			$deltaCmd->setValue($newValue);
 			$deltaCmd->save();
 		}
+		$this->setConsignes();
 	}
 
 	private function setZoneConsigne($zoneId) {
-		$now = strftime("%u%H%M");
-		$activeSchedule = [];
-		$nextSchedule = [];
+		function timeDiff($k1, $k2) {
+			$d1 = substr($k1,0,1);
+			$h1 = substr($k1,1,2);
+			$m1 = substr($k1,3,2);
+			$t1 = $d1*1440 + $h1*60 + $m1;
+			$d2 = substr($k2,0,1);
+			$h2 = substr($k2,1,2);
+			$m2 = substr($k2,3,2);
+			$t2 = $d2*1440 + $h2*60 + $m2;
+			if ($t1 < $t2){
+				return $t2 - $t1;
+			} else {
+				return 10080 - ($t1 - $t2);
+			}
+		}
+
+		$enAbsence=false;
+		$strNow = strftime("%u%H%M");
+		$now = new dateTime();
+		foreach ($this->getConfiguration('absences') as $absence) {
+			$du = dateTime::createFromFormat('d/m/Y H:i:s',$absence['du']);
+			$au = dateTime::createFromFormat('d/m/Y H:i:s',$absence['au']);
+			if ($du <= $now and $au >= $now){
+				$enAbsence = true;
+				$strNow = $au->format('NHi');
+				break;
+			}
+		}
+
 		$lastSchedule = [];
 		$firstSchedule = [];
+		$activeSchedule = [];
+		$nextSchedule = [];
 		foreach ($this->getConfiguration('schedules') as $schedule){
 			if ($schedule['zoneid'] != $zoneId){
 				continue;
 			}
-			if ($schedule['key'] <= $now) {
+			if ($schedule['key'] <= $strNow) {
 				if (! $activeSchedule || $schedule['key'] > $activeSchedule['key']) {
 					$activeSchedule = $schedule;
 				}
@@ -186,11 +215,23 @@ class chauffage extends eqLogic {
 		if (! $nextSchedule) {
 			$nextSchedule = $firstSchedule;
 		}
+		$consigne = "";
+		if ($enAbsence) {
+			$consigne = 4;
+		} else {
+			$consigne = $activeSchedule['consigne'];
+		}
+		if ($consigne < $nextSchedule['consigne']) {
+			$timeToNext = timeDiff($strNow, $nextSchedule['key']);
+			$consigneToNext = $nextSchedule['consigne'] - ($timeToNext * 2 / 60);
+			$consigne = max($consigne,$consigneToNext);
+		}
+		$consigne = round($consigne,1);
+
 		$cmd=$this->getConsigneCmd($zoneId);
 		if (is_object($cmd)){
-			$this->checkAndUpdateCmd($cmd,$activeSchedule['consigne']);
+			$this->checkAndUpdateCmd($cmd,$consigne);
 		}
-		return $activeSchedule['consigne'];
 	}
 
 	public function zoneExists($zoneId) {
