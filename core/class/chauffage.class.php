@@ -124,7 +124,7 @@ class chauffage extends eqLogic {
 			}
 			$cmd = $this->getDeltaCmd($zone['id']);
 			if (! is_object($cmd)){
-				log::add("chauffage","info",__(sprintf("%s: Création de la commande delty pour la zone '%s'", $this->getHumanName(), $zone['id']),__FILE__));
+				log::add("chauffage","info",__(sprintf("%s: Création de la commande delta pour la zone '%s'", $this->getHumanName(), $zone['id']),__FILE__));
 				$cmd = new chauffageCmd();
 				$cmd->setEqLogic_id($this->getId());
 				$cmd->setIsVisible(1);
@@ -283,7 +283,6 @@ class chauffage extends eqLogic {
 				}
 			}
 			$delta = $this->getDeltaCmd($zone['id']);
-			log::add("chauffage","info",$delta->getName());
 			$deltaSum += $delta->execCmd();
 		}
 		$statusCmd = $this->getCmd('info','chaudiere');
