@@ -85,8 +85,8 @@ class chauffage extends eqLogic {
 			}
 		}
 		foreach ($this->getConfiguration('absences') as $absence) {
-			$du = DateTime::createFromFormat("d/m/Y H:i:s", $absence['du'])->getTimeStamp();
-			$au = DateTime::createFromFormat("d/m/Y H:i:s", $absence['au'])->getTimeStamp();
+			$du = DateTime::createFromFormat("d/m/Y H:i", $absence['du'])->getTimeStamp();
+			$au = DateTime::createFromFormat("d/m/Y H:i", $absence['au'])->getTimeStamp();
 			if ($au <= $du) {
 				throw new Exception(__("La fin d'une période d'absence doit être postérieure à son début!",__FILE__));
 			}
@@ -95,6 +95,18 @@ class chauffage extends eqLogic {
 
 	// Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
 	public function postSave() {
+		$cmd = $this->getCmd('info','chaudiere');
+		if ( ! is_object($cmd)){
+			log::add("chauffage","info",__(sprintf("%s: Création de la commande 'chaudiere'", $this->getHumanName()),__FILE__));
+			$cmd = new chauffageCmd();
+			$cmd->setEqLogic_id($this->getId());
+			$cmd->setIsVisible(1);
+			$cmd->setName(__('Etat chaudière',__FILE__));
+			$cmd->setType('info');
+			$cmd->setSubType('binary');
+			$cmd->setLogicalId('chaudiere');
+			$cmd->save();
+		}
 		foreach ($this->getConfiguration('zones') as $zone) {
 			$cmd = $this->getConsigneCmd($zone['id']);
 			if (! is_object($cmd)){
@@ -121,6 +133,8 @@ class chauffage extends eqLogic {
 				$cmd->setSubType('numeric');
 				$cmd->setLogicalId('delta');
 				$cmd->setConfiguration('zoneId',$zone['id']);
+				$cmd->setConfiguration('minValue',"-20");
+				$cmd->setConfiguration('maxValue',"20");
 				$cmd->setUnite('°C');
 				$cmd->save();
 			}
@@ -152,6 +166,14 @@ class chauffage extends eqLogic {
 			$deltaCmd->setValue($newValue);
 			$deltaCmd->save();
 		}
+		$values = '';
+		foreach ($this->getCmd('info','delta',null,true) as $deltaCmd){
+			$values .= '#' . $deltaCmd->getId() . '#';
+		}
+		foreach ($this->getCmd('info','ouvrant',null,true) as $ouvrantCmd){
+			$values .= '#' . $ouvrantCmd->getId() . '#';
+		}
+		$this->getCmd('info','chaudiere')->setValue($values)->save();
 		$this->setConsignes();
 	}
 
@@ -172,15 +194,18 @@ class chauffage extends eqLogic {
 			}
 		}
 
+		log::add("chauffage","debug",sprintf(__("Début du calcul de la consigne pour la zone %s",__FILE__), $zoneId));
 		$enAbsence=false;
-		$strNow = strftime("%u%H%M");
+		$keyNow = strftime("%u%H%M");
+		$keyConsigne = $keyNow;
 		$now = new dateTime();
 		foreach ($this->getConfiguration('absences') as $absence) {
-			$du = dateTime::createFromFormat('d/m/Y H:i:s',$absence['du']);
-			$au = dateTime::createFromFormat('d/m/Y H:i:s',$absence['au']);
+			$du = dateTime::createFromFormat('d/m/Y H:i',$absence['du']);
+			$au = dateTime::createFromFormat('d/m/Y H:i',$absence['au']);
 			if ($du <= $now and $au >= $now){
 				$enAbsence = true;
-				$strNow = $au->format('NHi');
+				$keyConsigne = $au->format('NHi');
+				log::add("chauffage","debug",sprintf(__("En absence : => %s",__FILE__), $keyConsigne));
 				break;
 			}
 		}
@@ -193,7 +218,7 @@ class chauffage extends eqLogic {
 			if ($schedule['zoneid'] != $zoneId){
 				continue;
 			}
-			if ($schedule['key'] <= $strNow) {
+			if ($schedule['key'] <= $keyConsigne) {
 				if (! $activeSchedule || $schedule['key'] > $activeSchedule['key']) {
 					$activeSchedule = $schedule;
 				}
@@ -218,19 +243,80 @@ class chauffage extends eqLogic {
 		$consigne = "";
 		if ($enAbsence) {
 			$consigne = 4;
+			$nextSchedule['key'] = $keyConsigne;
+			$nextSchedule['consigne'] = $activeSchedule['consigne'];
 		} else {
 			$consigne = $activeSchedule['consigne'];
 		}
+		log::add("chauffage","debug",sprintf(__("activeSchedule: %s %4.1f°c",__FILE__),$activeSchedule['key'],$activeSchedule['consigne']));
+		log::add("chauffage","debug",sprintf(__("nextSchedule:   %s %4.1f°c",__FILE__),$nextSchedule['key'],$nextSchedule['consigne']));
+		log::add("chauffage","debug",sprintf(__("consigne brute:       %4.1f°C",__FILE__),$consigne));
 		if ($consigne < $nextSchedule['consigne']) {
-			$timeToNext = timeDiff($strNow, $nextSchedule['key']);
+			$timeToNext = timeDiff($keyNow, $nextSchedule['key']);
+			log::add("chauffage","debug",sprintf(__("Temps avant prochaine consigne: %s minutes",__FILE__),$timeToNext));
 			$consigneToNext = $nextSchedule['consigne'] - ($timeToNext * 2 / 60);
+			log::add("chauffage","debug",sprintf(__("Consigne pour atteindre prochaine consigne: %4.1f°c",__FILE__),$consigneToNext));
 			$consigne = max($consigne,$consigneToNext);
 		}
+		log::add("chauffage","debug",sprintf(__("consigne finale: %4.1f°C",__FILE__),$consigne));
 		$consigne = round($consigne,1);
 
 		$cmd=$this->getConsigneCmd($zoneId);
 		if (is_object($cmd)){
-			$this->checkAndUpdateCmd($cmd,$consigne);
+			if ($cmd->execCmd() != $consigne) {
+				log::add("chauffage","info",sprintf(__("consigne zone %s: %4.1f°C",__FILE__),$zoneId,$consigne));
+				$this->checkAndUpdateCmd($cmd,$consigne);
+			}
+		}
+	}
+
+	public function getChaudiereStatus () {
+		log::add("chauffage","debug",__("Calcul de statut de la chaudière",__FILE__));
+		$deltaSum = 0;
+		foreach ($this->getConfiguration('zones') as $zone){
+			if ($zone['isEnable'] != 1) {
+				continue;
+			}
+			foreach ($this->getOuvrantCmd($zone['id']) as $ouvrant){
+				if ($ouvrant->execCmd() == 1){
+					continue;
+				}
+			}
+			$delta = $this->getDeltaCmd($zone['id']);
+			log::add("chauffage","info",$delta->getName());
+			$deltaSum += $delta->execCmd();
+		}
+		$statusCmd = $this->getCmd('info','chaudiere');
+		if ($deltaSum < 0) {
+			if ($statusCmd->execCmd() != 1) {
+				log::add("chauffage","debug",__("Démarrage de la chaudière",__FILE__));
+				$cmdOnId = $this->getConfiguration('cmd_on');
+				log::add("chauffage","debug",$cmdOnId);
+				$cmdOnId = str_replace('#','',$cmdOnId);
+				log::add("chauffage","debug",$cmdOnId);
+				$cmdOn = cmd::byId($cmdOnId);
+				if (!is_object($cmdOn)) {
+					log::add("chauffage","error",sprintf(__("Commande d'enclenchement de la chaudière %s introuvable",__FILE__),$cmdOnId));
+				} else {
+					$cmdOn->execCmd();
+				}
+			}
+			return 1;
+		} else {
+			if ($statusCmd->execCmd() != 0) {
+				log::add("chauffage","debug",__("Arret de la chaudière",__FILE__));
+				$cmdOffId = $this->getConfiguration('cmd_off');
+				log::add("chauffage","debug",$cmdOffId);
+				$cmdOffId = str_replace('#','',$cmdOffId);
+				log::add("chauffage","debug",$cmdOffId);
+				$cmdOff = cmd::byId($cmdOffId);
+				if (!is_object($cmdOff)) {
+					log::add("chauffage","error",sprintf(__("Commande de déclenchement de la chaudière %s introuvable",__FILE__),$cmdOffId));
+				} else {
+					$cmdOff->execCmd();
+				}
+			}
+			return 0;
 		}
 	}
 
@@ -281,6 +367,20 @@ class chauffage extends eqLogic {
 
 	public function getTemperatureCmd($zoneId = 0) {
 		$cmds = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'temperature', true);
+		if ($zoneId == 0) {
+			return $cmds;
+		}
+		$cmdsToReturn = [];
+		foreach ($cmds as $cmd) {
+			if ($cmd->getConfiguration("zoneId") == $zoneId) {
+				$cmdsToReturn[] = $cmd;
+			}
+		}
+		return $cmdsToReturn;
+	}
+
+	public function getOuvrantCmd($zoneId = 0) {
+		$cmds = chauffageCmd::byEqLogicIdAndLogicalId($this->getId(),'ouvrant', true);
 		if ($zoneId == 0) {
 			return $cmds;
 		}
@@ -355,7 +455,7 @@ class chauffageCmd extends cmd {
 	// Exécution d'une commande
 	public function execute($_options = array()) {
 		$eqLogic = $this->getEqLogic();
-		log::add("chauffage","info","execute : " . $this->getHumanName() . "  LogicalId: " . $this->getLogicalId() );
+		log::add("chauffage","debug","execute: " . $this->getHumanName() . "  LogicalId: " . $this->getLogicalId() );
 		if ($this->getLogicalId() == 'refresh') {
 			$eqLogic->refresh();
 			return;
@@ -380,15 +480,20 @@ class chauffageCmd extends cmd {
 			$count = 0;
 			$total = 0;
 			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
+				log::add("chauffage","debug",sprintf(__("  %s: temperature: %s",__FILE__),$cmd->getHumanName(), $cmd->execCmd()));
 				$total += $cmd->execCmd();
 				$count++;
 			}
 			if ($count == 0){
 				return "";
 			}
-			return ($total/$count)-$consigne; 
+			$temperatureMoyenne = $total/$count;
+			log::add("chauffage","debug",__("  temperature moyenne:",__FILE__) . $temperatureMoyenne);
+			return $temperatureMoyenne-$consigne; 
 		}
-
+		if ($this->getLogicalId() == 'chaudiere') {
+			return $this->getEqLogic()->getChaudiereStatus();
+		}
 	}
 
 	/*     * **********************Getteur Setteur*************************** */

@@ -129,6 +129,25 @@ $eqLogics = eqLogic::byType($plugin->getId());
 
                             <legend><i class="fas fa-cogs"></i> {{Pamètres spécifiques}}</legend>
                             <div class="form-group">
+                                <label class="col-sm-4 control-label">{{Commande chaudière en}}</label>
+                                <div class="col-sm-6">
+                                    <input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="cmd_on" placeholder="{{Commande ON}}">
+                                </div>
+				<div class="col-sm-1">
+				    <a class="btn btn-succes listEquipementAction" data-input="cmd_on"><i class="fas fa-list-alt"></i></a>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{Commande chaudière hors}}</label>
+                                <div class="col-sm-6">
+                                    <input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="cmd_off" placeholder="{{Commande OFF}}">
+                                </div>
+				<div class="col-sm-1">
+				    <a class="btn btn-success listEquipementAction" data-input="cmd_off"><i class="fas fa-list-alt"></i></a>
+                                </div>
+                            </div>
+			    <br>
+                            <div class="form-group">
                                 <label class="col-sm-4 control-label">{{Zones}}</label>
                                 <div class="col-sm-6">
                                     <table id="table_zones" class="table table-bordered table-condensed">

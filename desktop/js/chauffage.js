@@ -103,6 +103,14 @@ $('#table_cmd').delegate('.listEquipementInfo', 'click', function() {
   })
 })
 
+/* Choix d'une action pour les commandes de chaudière */
+$('.listEquipementAction').on('click', function() {
+  var el = $(this)
+  jeedom.cmd.getSelectModal({ cmd: {type: 'action' } }, function(result) {
+    el.closest('div.form-group').find('.eqLogicAttr[data-l2key=' + el.data('input') + ']').value(result.human)
+  })
+})
+
 /* Récupère toutes les consignes dans un array */
 function schedulesFromTable() {
   let schedules = []
@@ -357,7 +365,7 @@ function addCmdToTable(_cmd) {
   if (init(_cmd.logicalId) == 'refresh') {
     return
   }
-  if ( _cmd.logicalId.search(/^consigne|delta$/) != -1){
+  if ( _cmd.logicalId.search(/^consigne|delta|chaudiere$/) != -1){
     typeDisabled = true
     subTypeDisabled = true
     zoneDisabled = true
@@ -461,7 +469,7 @@ function addAbsenceToTable(_absence) {
       dayOfWeekStart : 1,
       theme : datetimepicker_theme,
       minDate: Date.now(),
-      format: 'd/m/Y H:i:s',
+      format: 'd/m/Y H:i',
     })
   })
   if (isset(_absence)){
