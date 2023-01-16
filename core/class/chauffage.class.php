@@ -177,23 +177,23 @@ class chauffage extends eqLogic {
 		$this->setConsignes();
 	}
 
-	private function setZoneConsigne($zoneId) {
-		function timeDiff($k1, $k2) {
-			$d1 = substr($k1,0,1);
-			$h1 = substr($k1,1,2);
-			$m1 = substr($k1,3,2);
-			$t1 = $d1*1440 + $h1*60 + $m1;
-			$d2 = substr($k2,0,1);
-			$h2 = substr($k2,1,2);
-			$m2 = substr($k2,3,2);
-			$t2 = $d2*1440 + $h2*60 + $m2;
-			if ($t1 < $t2){
-				return $t2 - $t1;
-			} else {
-				return 10080 - ($t1 - $t2);
-			}
+	private function timeDiff($k1, $k2) {
+		$d1 = substr($k1,0,1);
+		$h1 = substr($k1,1,2);
+		$m1 = substr($k1,3,2);
+		$t1 = $d1*1440 + $h1*60 + $m1;
+		$d2 = substr($k2,0,1);
+		$h2 = substr($k2,1,2);
+		$m2 = substr($k2,3,2);
+		$t2 = $d2*1440 + $h2*60 + $m2;
+		if ($t1 < $t2){
+			return $t2 - $t1;
+		} else {
+			return 10080 - ($t1 - $t2);
 		}
+	}
 
+	private function setZoneConsigne($zoneId) {
 		log::add("chauffage","debug",sprintf(__("Début du calcul de la consigne pour la zone %s",__FILE__), $zoneId));
 		$enAbsence=false;
 		$keyNow = strftime("%u%H%M");
@@ -252,7 +252,7 @@ class chauffage extends eqLogic {
 		log::add("chauffage","debug",sprintf(__("nextSchedule:   %s %4.1f°c",__FILE__),$nextSchedule['key'],$nextSchedule['consigne']));
 		log::add("chauffage","debug",sprintf(__("consigne brute:       %4.1f°C",__FILE__),$consigne));
 		if ($consigne < $nextSchedule['consigne']) {
-			$timeToNext = timeDiff($keyNow, $nextSchedule['key']);
+			$timeToNext = $this->timeDiff($keyNow, $nextSchedule['key']);
 			log::add("chauffage","debug",sprintf(__("Temps avant prochaine consigne: %s minutes",__FILE__),$timeToNext));
 			$consigneToNext = $nextSchedule['consigne'] - ($timeToNext * 0.3 / 60);
 			log::add("chauffage","debug",sprintf(__("Consigne pour atteindre prochaine consigne: %4.1f°c",__FILE__),$consigneToNext));
