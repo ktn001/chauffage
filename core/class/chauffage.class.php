@@ -254,7 +254,7 @@ class chauffage extends eqLogic {
 		if ($consigne < $nextSchedule['consigne']) {
 			$timeToNext = timeDiff($keyNow, $nextSchedule['key']);
 			log::add("chauffage","debug",sprintf(__("Temps avant prochaine consigne: %s minutes",__FILE__),$timeToNext));
-			$consigneToNext = $nextSchedule['consigne'] - ($timeToNext * 1 / 60);
+			$consigneToNext = $nextSchedule['consigne'] - ($timeToNext * 0.3 / 60);
 			log::add("chauffage","debug",sprintf(__("Consigne pour atteindre prochaine consigne: %4.1f°c",__FILE__),$consigneToNext));
 			$consigne = max($consigne,$consigneToNext);
 		}
