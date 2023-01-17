@@ -153,8 +153,9 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                     <table id="table_zones" class="table table-bordered table-condensed">
                                         <thead>
                                             <tr>
-                                                <th class="hidden-xs" style="width:40px;">ID</th>
+                                                <th class="hidden-xs" style="width:35px;">ID</th>
                                                 <th>{{Nom}}</th>
+						<th style="width:60px">{{Gradiant}}</th>
                                                 <th style="width:40px">{{Actif}}</th>
                                                 <th style="width:50px">{{Action}}</th>
                                             </tr>

@@ -194,7 +194,8 @@ class chauffage extends eqLogic {
 	}
 
 	private function setZoneConsigne($zoneId) {
-		log::add("chauffage","debug",sprintf(__("Début du calcul de la consigne pour la zone %s",__FILE__), $zoneId));
+		$zone = $this->getZone($zoneId);
+		log::add("chauffage","debug",sprintf(__("Début du calcul de la consigne pour la zone '%s'",__FILE__), $zone[name]));
 		$enAbsence=false;
 		$keyNow = strftime("%u%H%M");
 		$keyConsigne = $keyNow;
@@ -252,6 +253,8 @@ class chauffage extends eqLogic {
 		log::add("chauffage","debug",sprintf(__("nextSchedule:   %s %4.1f°c",__FILE__),$nextSchedule['key'],$nextSchedule['consigne']));
 		log::add("chauffage","debug",sprintf(__("consigne brute:       %4.1f°C",__FILE__),$consigne));
 		if ($consigne < $nextSchedule['consigne']) {
+			$gradiant = is_numeric($zone[gradiant]) ? $zone[gradiant] : 0;
+			log::add("chauffage","debug","gradiant: " . $gradiant);
 			$timeToNext = $this->timeDiff($keyNow, $nextSchedule['key']);
 			log::add("chauffage","debug",sprintf(__("Temps avant prochaine consigne: %s minutes",__FILE__),$timeToNext));
 			$consigneToNext = $nextSchedule['consigne'] - ($timeToNext * 0.3 / 60);
@@ -264,7 +267,7 @@ class chauffage extends eqLogic {
 		$cmd=$this->getConsigneCmd($zoneId);
 		if (is_object($cmd)){
 			if ($cmd->execCmd() != $consigne) {
-				log::add("chauffage","info",sprintf(__("consigne zone %s: %4.1f°C",__FILE__),$zoneId,$consigne));
+				log::add("chauffage","info",sprintf(__("consigne zone '%s': %4.1f°C",__FILE__),$zone[name],$consigne));
 				$this->checkAndUpdateCmd($cmd,$consigne);
 			}
 		}
@@ -317,6 +320,15 @@ class chauffage extends eqLogic {
 			}
 			return 0;
 		}
+	}
+
+	public function getZone($zoneId) {
+		foreach ($this->getConfiguration('zones') as $zone) {
+			if ($zone['id'] == $zoneId){
+				return $zone;
+			}
+		}
+		return False;
 	}
 
 	public function zoneExists($zoneId) {
