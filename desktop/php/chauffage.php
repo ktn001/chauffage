@@ -297,7 +297,8 @@ $eqLogics = eqLogic::byType($plugin->getId());
                    </table>
                    <script>
                         $(function() {
-                            $('#datepicker').datetimepicker()
+                            // $('#datepicker').datetimepicker()
+			    jeedomUtils.dateTimePickerInit('#timepicker')
                         })
                    </script>
                </div> <!-- moitié droite du panel -->

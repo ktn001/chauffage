@@ -14,13 +14,13 @@
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
 
-$(function() {
-  $.datetimepicker.setLocale(jeedom_langage.substr(0,2))
-  datetimepicker_theme = ''
-  if (jeedom.theme.default_bootstrap_theme.toLowerCase().includes('dark')){
-    datetimepicker_theme = 'dark'
-  }
-})
+// $(function() {
+//   $.datetimepicker.setLocale(jeedom_langage.substr(0,2))
+//   datetimepicker_theme = ''
+//   if (jeedom.theme.default_bootstrap_theme.toLowerCase().includes('dark')){
+//     datetimepicker_theme = 'dark'
+//   }
+// })
 
 /* Permet la réorganisation des commandes dans l'équipement */
 $("#table_cmd").sortable({
@@ -466,15 +466,17 @@ function addAbsenceToTable(_absence) {
   tr += '</tr>'
   $('#table_absences tbody').append(tr)
   tr = $('#table_absences tbody tr').last()
-  tr.find('.datetimepicker').each(function () {
-    $(this).datetimepicker({
-      step: 30,
-      dayOfWeekStart : 1,
-      theme : datetimepicker_theme,
-      minDate: Date.now(),
-      format: 'd/m/Y H:i',
-    })
-  })
+  jeedomUtils.datePickerInit('d/m/Y H:i', '#table_absences tbody tr:last-child .datetimepicker')
+  // tr.find('.datetimepicker').each(function () {
+  //  jeedomUtils.dateTimePickerInit('.timepicker')
+  //   $(this).datetimepicker({
+  //     step: 30,
+  //     dayOfWeekStart : 1,
+  //     theme : datetimepicker_theme,
+  //     minDate: Date.now(),
+  //     format: 'd/m/Y H:i',
+  //   })
+  // })
   if (isset(_absence)){
     tr.setValues(_absence, '.absenceAttr')
   }
@@ -482,8 +484,8 @@ function addAbsenceToTable(_absence) {
 
 /* Changement de date de début d'absence */
 $('#table_absences tbody').on('change','.absenceAttr[data-l1key=du]', function(e) {
-  fromDate = $(this).datetimepicker('getValue')
-  $(this).closest('tr').find('.absenceAttr[data-l1key=au]').datetimepicker('setOptions',{minDate:fromDate})
+  // fromDate = $(this).datetimepicker('getValue')
+  // $(this).closest('tr').find('.absenceAttr[data-l1key=au]').datetimepicker('setOptions',{minDate:fromDate})
 })
 
 /* Suppression d'une absence */
