@@ -462,7 +462,7 @@ class chauffageCmd extends cmd {
 			$total = 0;
 			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
 				$age = strtotime('now') - strtotime($cmd->getCollectDate());
-				log::add("chauffage","info"; sprintf(__("  %s: age: %s",__FILE__),$cmd->getHumanName(), $age));
+				log::add("chauffage","info", sprintf(__("  %s: age: %s",__FILE__),$cmd->getHumanName(), $age));
 				log::add("chauffage","debug",sprintf(__("  %s: temperature: %s",__FILE__),$cmd->getHumanName(), $cmd->execCmd()));
 				$total += $cmd->execCmd();
 				$count++;
