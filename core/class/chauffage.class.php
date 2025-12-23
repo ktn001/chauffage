@@ -256,7 +256,7 @@ class chauffage extends eqLogic {
 				}
 			}
 			$delta = $this->getDeltaCmd($zone['id']);
-			if (!is_object($delta) or $delta->getCache('disturbed') == 1) {
+			if (!$delta->isOk()) {
 				log::add("chauffage","warning",sprintf(__("  La zone %s est en défaut",__FILE__),$zone['id']));
 				continue;
 			}
@@ -437,6 +437,30 @@ class chauffageCmd extends cmd {
 		}
 	}
 
+	public function isOk() {
+		if ($this->getLogicalId() == 'delta') {
+			$zoneId = $this->getConfiguration('zoneId');
+			$eqLogic = $this->getEqLogic();
+			$consigneCmd = $eqLogic->getConsigneCmd($zoneId);
+			if (! is_object($consigneCmd)) {
+				log::add("chauffage","error",sprintf(__("Commamde de consigne pour la zone %1 introuvable",__FILE__),$zoneId));
+				return false;
+			}
+			$ok = true;
+			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
+				$age = strtotime('now') - strtotime($cmd->getCollectDate());
+				if ($age > 40) {
+					log::add("chauffage","warning",sprintf(__("La commande %s n'a pas été actualisée depuis %s minutes",__FILE__),$cmd->getHumanName(),$age/60));
+					$ok = false;
+			}
+			if (! $ok) {
+				return false;
+			}
+			return true;
+		}
+		return true;
+	}
+
 	// Exécution d'une commande
 	public function execute($_options = array()) {
 		$eqLogic = $this->getEqLogic();
@@ -465,21 +489,13 @@ class chauffageCmd extends cmd {
 			$count = 0;
 			$total = 0;
 			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
-				$age = strtotime('now') - strtotime($cmd->getCollectDate());
-				//if ($age > 14400) {
-				if ($age > 40) {
-					log::add("chauffage","error", sprintf(__("  %s: pas actualisée depuis %s minutes",__FILE__),$cmd->getHumanName(), $age/60));
-					continue;
-				}
 				log::add("chauffage","debug",sprintf(__("  %s: temperature: %s",__FILE__),$cmd->getHumanName(), $cmd->execCmd()));
 				$total += $cmd->execCmd();
 				$count++;
 			}
 			if ($count == 0){
-				$this->setCache('disturbed',1);
 				return "";
 			}
-			$this->setCache('disturbed',0);
 			$temperatureMoyenne = $total/$count;
 			log::add("chauffage","debug",__("  temperature moyenne:",__FILE__) . $temperatureMoyenne);
 			return $temperatureMoyenne-$consigne; 
