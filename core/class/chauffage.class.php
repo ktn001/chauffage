@@ -449,7 +449,7 @@ class chauffageCmd extends cmd {
 			$ok = true;
 			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
 				$age = strtotime('now') - strtotime($cmd->getCollectDate());
-				if ($age > 40) {
+				if ($age > 14400) {
 					log::add("chauffage","warning",sprintf(__("La commande %s n'a pas été actualisée depuis %s minutes",__FILE__),$cmd->getHumanName(),$age/60));
 					$ok = false;
 				}
