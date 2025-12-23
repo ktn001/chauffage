@@ -256,7 +256,11 @@ class chauffage extends eqLogic {
 				}
 			}
 			$delta = $this->getDeltaCmd($zone['id']);
-			$deltaSum += $delta->execCmd();
+			if (!is_object($delta) or $delta->getCache('disturbed') == 1) {
+				log::add("chaudiere","warning",sprintf(__("  La zone %s est en défaut",__FILE__),$zone['id']));
+				continue;
+			}
+			$deltaSum += $delta->execCmd() * $zone['poids'];
 		}
 		$statusCmd = $this->getCmd('info','chaudiere');
 		if ($deltaSum < 0) {
@@ -462,17 +466,20 @@ class chauffageCmd extends cmd {
 			$total = 0;
 			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
 				$age = strtotime('now') - strtotime($cmd->getCollectDate());
-				if ($age > 14400) {
+				//if ($age > 14400) {
+				if ($age > 40) {
 					log::add("chauffage","error", sprintf(__("  %s: pas actualisée depuis %s minutes",__FILE__),$cmd->getHumanName(), $age/60));
-					return 0;
+					continue;
 				}
 				log::add("chauffage","debug",sprintf(__("  %s: temperature: %s",__FILE__),$cmd->getHumanName(), $cmd->execCmd()));
 				$total += $cmd->execCmd();
 				$count++;
 			}
 			if ($count == 0){
+				$this->setCache('disturbed',1);
 				return "";
 			}
+			$this->setCache('disturbed',0);
 			$temperatureMoyenne = $total/$count;
 			log::add("chauffage","debug",__("  temperature moyenne:",__FILE__) . $temperatureMoyenne);
 			return $temperatureMoyenne-$consigne; 
