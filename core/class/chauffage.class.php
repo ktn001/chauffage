@@ -24,16 +24,6 @@ class chauffage extends eqLogic {
 	/*     * ***********************Methode static*************************** */
 
 	/*
-	* Fonction exécutée automatiquement toutes les minutes par Jeedom
-	public static function cron() {}
-	*/
-
-	/*
-	* Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
-	public static function cron5() {}
-	*/
-
-	/*
 	* Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
 	*/
 	public static function cron10() {
@@ -41,26 +31,6 @@ class chauffage extends eqLogic {
 			$chauffage->setConsignes();
 		}
 	}
-
-	/*
-	* Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
-	public static function cron15() {}
-	*/
-
-	/*
-	* Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
-	public static function cron30() {}
-	*/
-
-	/*
-	* Fonction exécutée automatiquement toutes les heures par Jeedom
-	public static function cronHourly() {}
-	*/
-
-	/*
-	* Fonction exécutée automatiquement tous les jours par Jeedom
-	public static function cronDaily() {}
-	*/
 
 	/*     * *********************Méthodes d'instance************************* */
 
@@ -491,6 +461,8 @@ class chauffageCmd extends cmd {
 			$count = 0;
 			$total = 0;
 			foreach ($eqLogic->getTemperatureCmd($zoneId) as $cmd) {
+				$age = strtotime('now') - strtotime($cmd->getCollectDate());
+				log::add("chauffage","info"; sprintf(__("  %s: age: %s",__FILE__),$cmd->getHumanName(), $age));
 				log::add("chauffage","debug",sprintf(__("  %s: temperature: %s",__FILE__),$cmd->getHumanName(), $cmd->execCmd()));
 				$total += $cmd->execCmd();
 				$count++;
