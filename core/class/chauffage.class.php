@@ -257,7 +257,7 @@ class chauffage extends eqLogic {
 			}
 			$delta = $this->getDeltaCmd($zone['id']);
 			if (!is_object($delta) or $delta->getCache('disturbed') == 1) {
-				log::add("chaudiere","warning",sprintf(__("  La zone %s est en défaut",__FILE__),$zone['id']));
+				log::add("chauffage","warning",sprintf(__("  La zone %s est en défaut",__FILE__),$zone['id']));
 				continue;
 			}
 			$deltaSum += $delta->execCmd() * $zone['poids'];
