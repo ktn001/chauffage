@@ -452,6 +452,7 @@ class chauffageCmd extends cmd {
 				if ($age > 40) {
 					log::add("chauffage","warning",sprintf(__("La commande %s n'a pas été actualisée depuis %s minutes",__FILE__),$cmd->getHumanName(),$age/60));
 					$ok = false;
+				}
 			}
 			if (! $ok) {
 				return false;
