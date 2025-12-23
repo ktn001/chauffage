@@ -26,7 +26,7 @@ class chauffage extends eqLogic {
 	/*
 	* Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
 	*/
-	public static function cron10() {
+	public static function cron5() {
 		foreach (self::byType(__CLASS__,true) as $chauffage) {
 			$chauffage->setConsignes();
 		}
